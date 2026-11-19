@@ -30,7 +30,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.composer/cache/files
-          key: composer-${{ hashFiles('backend/composer.lock') }}
+          # Per-job key (no two jobs racing to save the same entry) + restore-keys,
+          # so a composer.lock change still starts from the closest previous cache.
+          key: composer-${{ runner.os }}-${{ github.job }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-${{ github.job }}-
+            composer-${{ runner.os }}-
 
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: cp .env.example .env && php artisan key:generate
@@ -73,7 +78,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.composer/cache/files
-          key: composer-${{ hashFiles('backend/composer.lock') }}
+          # Per-job key (no two jobs racing to save the same entry) + restore-keys,
+          # so a composer.lock change still starts from the closest previous cache.
+          key: composer-${{ runner.os }}-${{ github.job }}-${{ hashFiles('backend/composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-${{ github.job }}-
+            composer-${{ runner.os }}-
 
       - run: composer install --no-interaction --prefer-dist --no-progress
       - run: cp .env.example .env && php artisan key:generate
