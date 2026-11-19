@@ -41,4 +41,5 @@ docs/openapi.yaml                            OpenAPI 3 spec, served at /api/open
 resources/views/api-docs.blade.php           Swagger UI page
 tests/Feature/RegistrationTest.php           42 feature tests (booking rules, verification, cancel link, pagination, admin edit)
 tests/Feature/ApiDocumentationTest.php       6 tests: every route documented and vice versa, $refs valid, admin ops need bearer auth
+tests/Unit/RegistrationVerificationTest.php  pure unit tests (email masking, token hashing)
 ```

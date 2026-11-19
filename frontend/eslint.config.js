@@ -30,4 +30,9 @@ export default [
       ],
     },
   },
+  // Config files run in Node (e.g. vite.config.js reads process.env).
+  {
+    files: ['*.config.js'],
+    languageOptions: { globals: globals.node },
+  },
 ]
