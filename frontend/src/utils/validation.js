@@ -13,12 +13,20 @@ export function validateRegistration({ name, email }) {
   return errors
 }
 
-/** `minCapacity`: when editing, capacity can't go below the confirmed bookings. */
-export function validateEvent({ title, event_date, max_attendees, start_time }, today, { minCapacity = 0 } = {}) {
+/**
+ * `minCapacity`: when editing, capacity can't go below the confirmed bookings.
+ * `checkPast`: false when editing and the date was not changed (it is not re-sent either).
+ * `today` must be in the app timezone (see todayYmd) — the server makes the final call.
+ */
+export function validateEvent(
+  { title, event_date, max_attendees, start_time },
+  today,
+  { minCapacity = 0, checkPast = true } = {},
+) {
   const errors = {}
   if (!title.trim()) errors.title = 'Title is required.'
   if (!event_date) errors.event_date = 'Date is required.'
-  else if (event_date < today) errors.event_date = 'Date cannot be in the past.'
+  else if (checkPast && event_date < today) errors.event_date = 'Date cannot be in the past.'
   if (start_time && !/^\d{2}:\d{2}$/.test(start_time)) errors.start_time = 'Use HH:MM.'
   const n = Number(max_attendees)
   if (max_attendees === '' || !Number.isInteger(n) || n < 1) errors.max_attendees = 'Capacity must be a whole number ≥ 1.'

@@ -55,6 +55,50 @@ describe('<EventForm /> edit mode', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ venue: null, max_attendees: 30, title: 'Laravel Meetup' }))
   })
 
+  it('does not re-validate or re-send an unchanged date (title-only edit)', async () => {
+    // An event "today" in Kuala Lumpur can look like "yesterday" to a browser elsewhere —
+    // an unchanged date must never block the edit.
+    const onSubmit = vi.fn().mockResolvedValue()
+    render(
+      <EventForm mode="edit" initial={toFormValues({ ...event, event_date: '2000-01-01' })} bookedCount={0}
+        submitLabel="Save changes" busyLabel="Saving…" onSubmit={onSubmit} />,
+    )
+
+    await userEvent.type(screen.getByLabelText(/Title/), ' (updated)')
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('event_date')
+    expect(onSubmit.mock.calls[0][0].title).toBe('Laravel Meetup (updated)')
+  })
+
+  it('still validates a changed date against today', async () => {
+    const onSubmit = vi.fn()
+    renderEdit(onSubmit)
+    const date = screen.getByLabelText(/Date/)
+    await userEvent.clear(date)
+    await userEvent.type(date, '2001-01-01')
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(screen.getByText('Date cannot be in the past.')).toBeInTheDocument()
+    expect(onSubmit).not.toHaveBeenCalled()
+  })
+
+  it('reports busy state to the parent while saving', async () => {
+    let resolve
+    const onBusyChange = vi.fn()
+    render(
+      <EventForm mode="edit" initial={toFormValues(event)} bookedCount={12} submitLabel="Save changes"
+        busyLabel="Saving…" onBusyChange={onBusyChange} onSubmit={() => new Promise((r) => { resolve = r })} />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(onBusyChange).toHaveBeenLastCalledWith(true)
+
+    resolve()
+    await screen.findByRole('button', { name: 'Save changes' })
+    expect(onBusyChange).toHaveBeenLastCalledWith(false)
+  })
+
   it('shows the server error (e.g. date conflict) and keeps the form open', async () => {
     const onSubmit = vi.fn().mockRejectedValue(Object.assign(
       new Error("Can't move the event to 2099-04-01: 2 attendee(s) already have another booking on that date."),

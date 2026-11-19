@@ -5,6 +5,7 @@ Setup, API and design notes are in the [root README](../README.md).
 ```bash
 npm install
 cp .env.example .env     # VITE_API_URL=/api → proxied to http://127.0.0.1:8000 by Vite
+                         # VITE_APP_TIMEZONE must match the backend APP_TIMEZONE ("today"/"past" in forms)
 npm run dev              # http://localhost:5173
 npm run build            # production build in dist/
 npm test                 # unit tests (Vitest + Testing Library)

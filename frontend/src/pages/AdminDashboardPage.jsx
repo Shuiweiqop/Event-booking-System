@@ -14,11 +14,21 @@ export default function AdminDashboardPage() {
   const [page, setPage] = useState(1)
   const { events, meta, loading, error, refetch } = useEvents({ include_past: 1, page, per_page: 10 })
   const [flash, setFlash] = useState(null)
+  // The edit dialog lives at page level and holds a snapshot of the event, so the list can
+  // auto-refresh (or the event can move to another page) underneath without closing it.
+  const [editing, setEditing] = useState(null)
+  const [saving, setSaving] = useState(false)
 
   // Deleting the last event on the last page would leave an empty page — step back.
   useEffect(() => {
     if (meta && page > meta.last_page) setPage(meta.last_page)
   }, [meta, page])
+
+  /** Shared success handler for create / edit / delete. */
+  const done = (msg) => {
+    setFlash({ type: 'success', text: msg })
+    refetch()
+  }
 
   return (
     <section className="container">
@@ -32,7 +42,7 @@ export default function AdminDashboardPage() {
       {flash && <Alert type={flash.type} onClose={() => setFlash(null)}>{flash.text}</Alert>}
 
       <div className="admin-grid">
-        <CreateEventForm onCreated={(msg) => { setFlash({ type: 'success', text: msg }); refetch() }} />
+        <CreateEventForm onCreated={done} />
 
         <div className="card">
           <h2>All events</h2>
@@ -45,8 +55,8 @@ export default function AdminDashboardPage() {
             <ul className="admin-events">
               {events.map((ev) => (
                 <AdminEventRow key={ev.id} event={ev}
-                  onDeleted={(msg) => { setFlash({ type: 'success', text: msg }); refetch() }}
-                  onSaved={(msg) => { setFlash({ type: 'success', text: msg }); refetch() }}
+                  onEdit={() => setEditing(ev)}
+                  onDeleted={done}
                   onError={(msg) => setFlash({ type: 'error', text: msg })} />
               ))}
             </ul>
@@ -54,6 +64,26 @@ export default function AdminDashboardPage() {
           <Pagination meta={meta} onChange={setPage} disabled={loading} label="events" />
         </div>
       </div>
+
+      {editing && (
+        // closeDisabled while saving: the admin must see whether the save worked (e.g. a 409 date conflict).
+        <Modal title="Edit event" onClose={() => setEditing(null)} closeDisabled={saving}>
+          <EventForm
+            mode="edit"
+            initial={toFormValues(editing)}
+            bookedCount={editing.registered_count}
+            submitLabel="Save changes"
+            busyLabel="Saving…"
+            onBusyChange={setSaving}
+            onCancel={() => setEditing(null)}
+            onSubmit={async (payload) => {
+              const body = await adminApi.updateEvent(editing.id, payload)
+              setEditing(null)
+              done(`${body.message} "${body.data.title}"`)
+            }}
+          />
+        </Modal>
+      )}
     </section>
   )
 }
@@ -74,9 +104,8 @@ function CreateEventForm({ onCreated }) {
   )
 }
 
-function AdminEventRow({ event, onDeleted, onSaved, onError }) {
+function AdminEventRow({ event, onEdit, onDeleted, onError }) {
   const [busy, setBusy] = useState(false)
-  const [editing, setEditing] = useState(false)
   const [regs, setRegs] = useState(null)
   const [open, setOpen] = useState(false)
 
@@ -116,7 +145,7 @@ function AdminEventRow({ event, onDeleted, onSaved, onError }) {
         </div>
         <div className="admin-event__actions">
           {!event.is_past && (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={() => setEditing(true)}>Edit</button>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={onEdit}>Edit</button>
           )}
           <button type="button" className="btn btn--ghost btn--sm" onClick={toggle} aria-expanded={open}>
             {open ? 'Hide' : 'Attendees'}
@@ -142,25 +171,6 @@ function AdminEventRow({ event, onDeleted, onSaved, onError }) {
             </tbody>
           </table>
         )
-      )}
-      {editing && (
-        <Modal title="Edit event" onClose={() => setEditing(false)}>
-          <EventForm
-            mode="edit"
-            initial={toFormValues(event)}
-            bookedCount={event.registered_count}
-            submitLabel="Save changes"
-            busyLabel="Saving…"
-            onCancel={() => setEditing(false)}
-            onSubmit={async (payload) => {
-              const body = await adminApi.updateEvent(event.id, payload)
-              setEditing(false)
-              setRegs(null)
-              setOpen(false)
-              onSaved(`${body.message} "${body.data.title}"`)
-            }}
-          />
-        </Modal>
       )}
     </li>
   )

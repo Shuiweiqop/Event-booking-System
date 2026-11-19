@@ -14,6 +14,8 @@ import Spinner from './Spinner'
  * in create mode they are omitted.
  * `bookedCount` (edit mode) enforces the "capacity ≥ confirmed bookings" rule client-side and
  * warns that moving the date moves those bookings too.
+ * In edit mode an unchanged date is neither re-validated nor re-sent, so e.g. a title fix never
+ * fails on a date check. `onBusyChange(busy)` lets the parent lock its dialog while saving.
  */
 export default function EventForm({
   initial = EMPTY_EVENT,
@@ -23,12 +25,19 @@ export default function EventForm({
   busyLabel,
   onSubmit,
   onCancel,
+  onBusyChange,
 }) {
   const [form, setForm] = useState(initial)
   const [errors, setErrors] = useState({})
   const [serverError, setServerError] = useState(null)
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusyState] = useState(false)
   const isEdit = mode === 'edit'
+  const dateChanged = !isEdit || form.event_date !== initial.event_date
+
+  const setBusy = (value) => {
+    setBusyState(value)
+    onBusyChange?.(value)
+  }
 
   const set = (k) => (e) => {
     setForm({ ...form, [k]: e.target.value })
@@ -38,10 +47,11 @@ export default function EventForm({
 
   const submit = async (e) => {
     e.preventDefault()
-    const v = validateEvent(form, todayYmd(), { minCapacity: bookedCount })
+    const v = validateEvent(form, todayYmd(), { minCapacity: bookedCount, checkPast: dateChanged })
     if (Object.keys(v).length) return setErrors(v)
 
     const payload = { ...form, max_attendees: Number(form.max_attendees) }
+    if (!dateChanged) delete payload.event_date
     for (const k of ['description', 'venue', 'start_time']) {
       if (payload[k] === '') {
         if (isEdit) payload[k] = null

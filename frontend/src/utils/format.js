@@ -22,8 +22,13 @@ export const formatTime = (hhmm) => {
   return new Date(2000, 0, 1, h, m).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
-export const todayYmd = () => {
-  const d = new Date()
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
+/** Must match the backend's APP_TIMEZONE: the server decides what "today" / "past" means. */
+export const APP_TIMEZONE = import.meta.env.VITE_APP_TIMEZONE || 'Asia/Kuala_Lumpur'
+
+/**
+ * Today's date (YYYY-MM-DD) in the app timezone — NOT the browser's. Otherwise an admin in
+ * UTC+13 would see today's events as "past", and one west of Malaysia would be allowed to pick
+ * a date the server then rejects.
+ */
+export const todayYmd = (now = new Date(), timeZone = APP_TIMEZONE) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)

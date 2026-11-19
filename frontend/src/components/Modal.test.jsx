@@ -55,6 +55,43 @@ describe('<Modal />', () => {
     expect(screen.getByRole('button', { name: 'Save' })).toHaveFocus()
   })
 
+  it('skips hidden inputs when choosing what to focus', async () => {
+    render(
+      <>
+        <button type="button">Behind</button>
+        <Modal title="Dialog" onClose={() => {}}>
+          <input type="hidden" name="token" value="x" />
+          <input aria-label="Visible" />
+        </Modal>
+      </>,
+    )
+    expect(screen.getByLabelText('Visible')).toHaveFocus()
+  })
+
+  it('keeps focus inside the dialog even when it has no fields', async () => {
+    render(
+      <>
+        <button type="button">Behind</button>
+        <Modal title="Dialog" onClose={() => {}}><p>Just text</p></Modal>
+      </>,
+    )
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement)
+    expect(screen.getByRole('button', { name: 'Behind' })).not.toHaveFocus()
+  })
+
+  it('cannot be closed while closeDisabled (e.g. saving)', async () => {
+    const onClose = vi.fn()
+    const { container } = render(
+      <Modal title="Saving" onClose={onClose} closeDisabled><input aria-label="Name" /></Modal>,
+    )
+
+    await userEvent.keyboard('{Escape}')
+    await userEvent.click(container.querySelector('.modal-backdrop'))
+    expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled()
+
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('closes on Escape and returns focus to the button that opened it', async () => {
     const onClose = vi.fn()
     render(<Harness onClose={onClose} />)

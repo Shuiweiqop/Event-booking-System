@@ -194,7 +194,7 @@ php artisan test
 ```bash
 cd frontend
 npm install
-cp .env.example .env            # VITE_API_URL=/api (uses the Vite proxy)
+cp .env.example .env            # VITE_API_URL=/api (Vite proxy), VITE_APP_TIMEZONE=Asia/Kuala_Lumpur (must match backend APP_TIMEZONE)
 npm run dev                     # http://localhost:5173
 npm test                        # frontend unit tests (Vitest)
 ```
@@ -368,7 +368,7 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] One-click-safe cancel link in the confirmation email: `/cancel?id=…&token=…` opens a confirmation page, and only the explicit button cancels
 - [x] API documentation: OpenAPI 3 spec + Swagger UI at `/api/docs`, kept in sync with the routes by a test
 - [x] Housekeeping: abandoned email verifications are pruned daily (`MassPrunable` + scheduler); dialogs trap focus and return it to the opener
-- [x] Automated tests: 55 backend tests (50 feature + 5 unit, PHPUnit) + 41 frontend unit tests (Vitest)
+- [x] Automated tests: 55 backend tests (50 feature + 5 unit, PHPUnit) + 50 frontend unit tests (Vitest)
 - [x] Continuous integration (GitHub Actions): backend tests, the MySQL 8 concurrency test, frontend lint/tests/build and the Docker build on every push
 
 ## 8. Assumptions
