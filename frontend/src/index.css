@@ -55,6 +55,13 @@ code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 
 .page-head { display: flex; justify-content: space-between; align-items: end; gap: 1rem; margin-bottom: 1.5rem; }
 .page-head p { margin: .35rem 0 0; }
+.page-head { flex-wrap: wrap; }
+.live { display: inline-flex; align-items: center; gap: .45rem; margin: 0; font-size: .82rem; color: var(--muted); white-space: nowrap; }
+.live__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 0 rgba(44, 122, 75, .5); animation: pulse 2s infinite; }
+.live--stale { color: var(--warn); }
+.live--stale .live__dot { background: var(--accent); animation: none; }
+@keyframes pulse { 70% { box-shadow: 0 0 0 7px rgba(44, 122, 75, 0); } 100% { box-shadow: 0 0 0 0 rgba(44, 122, 75, 0); } }
+@media (prefers-reduced-motion: reduce) { .live__dot { animation: none; } }
 
 /* ---------- Buttons ---------- */
 .btn {

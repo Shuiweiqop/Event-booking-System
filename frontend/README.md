@@ -7,6 +7,7 @@ npm install
 cp .env.example .env     # VITE_API_URL=/api → proxied to http://127.0.0.1:8000 by Vite
 npm run dev              # http://localhost:5173
 npm run build            # production build in dist/
+npm test                 # unit tests (Vitest + Testing Library)
 ```
 
 ## Pages
@@ -30,13 +31,17 @@ src/
 │   ├── RegistrationForm.jsx details → verify code → confirmation (3 steps)
 │   ├── VerifyCodeStep.jsx   6-digit code input, attempts/expiry errors, resend countdown
 │   ├── InputField.jsx       label + input + inline error (accessible)
+│   ├── LiveIndicator.jsx    "Live · slots updated 12s ago"
 │   ├── Modal.jsx, Alert.jsx, Spinner.jsx, EmptyState.jsx, Navbar.jsx
 ├── context/AuthContext.jsx  admin token state, login / logout
 ├── hooks/
-│   ├── useEvents.js         fetch + loading/error + refetch, aborts stale requests
+│   ├── useEvents.js         fetch + loading/error + refetch, aborts stale requests,
+│   │                        auto-refresh every 30 s / on tab focus (paused while hidden)
+│   ├── useEvents.test.js    8 tests for the refresh behaviour (fake timers)
 │   ├── useMyBookings.js     localStorage bookings, synced across tabs
 │   └── useCountdown.js      seconds-left timer (resend cooldown)
 ├── pages/                   EventsPage, MyBookingsPage, AdminLoginPage, AdminDashboardPage
+├── test/setup.js            jest-dom matchers + cleanup between tests
 ├── utils/                   format.js (dates), validation.js
 ├── App.jsx                  routes
 └── main.jsx

@@ -3,6 +3,7 @@ import Alert from '../components/Alert'
 import EmptyState from '../components/EmptyState'
 import EventCard from '../components/EventCard'
 import EventFilters from '../components/EventFilters'
+import LiveIndicator from '../components/LiveIndicator'
 import Modal from '../components/Modal'
 import RegistrationForm from '../components/RegistrationForm'
 import Spinner from '../components/Spinner'
@@ -14,7 +15,10 @@ const INITIAL_FILTERS = { search: '', date: '', include_past: false }
 export default function EventsPage() {
   const [filters, setFilters] = useState(INITIAL_FILTERS)
   const [selected, setSelected] = useState(null)
-  const { events, loading, error, refetch } = useEvents({ ...filters, include_past: filters.include_past ? 1 : '' })
+  const { events, loading, error, refreshError, lastUpdated, refetch } = useEvents({
+    ...filters,
+    include_past: filters.include_past ? 1 : '',
+  })
   const { bookings } = useMyBookings()
 
   const bookedIds = new Set(bookings.filter((b) => b.status === 'confirmed').map((b) => b.event_id))
@@ -27,6 +31,7 @@ export default function EventsPage() {
           <h1>Upcoming events</h1>
           <p className="muted">Pick an event and reserve your seat. You can book one event per day.</p>
         </div>
+        <LiveIndicator lastUpdated={lastUpdated} refreshError={refreshError} />
       </div>
 
       <EventFilters value={filters} onChange={setFilters} />

@@ -93,6 +93,7 @@ cd frontend
 npm install
 cp .env.example .env            # VITE_API_URL=/api (uses the Vite proxy)
 npm run dev                     # http://localhost:5173
+npm test                        # frontend unit tests (Vitest)
 ```
 
 In development, Vite proxies `/api/*` to `http://127.0.0.1:8000`, so no CORS setup is needed. For a production build, set `VITE_API_URL` to the full API URL and run `npm run build`.
@@ -254,6 +255,7 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] Email verification (6-digit code) before a booking is confirmed, plus a confirmation email with the cancellation code
 - [x] Real concurrency test against MySQL (`php artisan booking:race-test`)
 - [x] Deployable demo: `docker compose up --build` (MySQL 8 + Laravel + nginx)
+- [x] Live slot counts: the event list auto-refreshes every 30 s and when the tab regains focus (paused while hidden)
 - [x] Automated backend tests (23 feature tests)
 
 ## 8. Assumptions
