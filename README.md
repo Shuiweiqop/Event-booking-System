@@ -17,12 +17,44 @@ event-booking/
 
 ## 1. Setup
 
-### Requirements
+### Option A: Docker (one command, recommended for a quick look)
+
+Requires only Docker Desktop. No PHP, Composer, Node or MySQL installation is needed.
+
+```bash
+docker compose up --build
+```
+
+| URL | What |
+|---|---|
+| http://localhost:8088 | The app (React served by nginx, `/api` proxied to Laravel) |
+| http://localhost:8001/api | The API directly (e.g. for Postman: set `baseUrl` to this) |
+
+The first start takes a few minutes (it pulls images and installs dependencies). On every start, the backend container waits for MySQL and then runs the migrations and the seeder. Admin login: `admin@example.com` / `Admin@123`.
+
+Three containers are started:
+
+- `db`: MySQL 8, data kept in a named volume.
+- `backend`: PHP 8.2, `artisan serve` with 8 workers, so requests are handled in parallel.
+- `frontend`: multi-stage Node build, served by nginx with an SPA fallback.
+
+Useful commands:
+
+```bash
+docker compose logs -f backend                                   # API logs, incl. the "sent" emails
+docker compose exec backend php artisan booking:race-test        # concurrency test on MySQL 8
+docker compose exec backend php artisan migrate:fresh --seed     # reset demo data
+docker compose down -v                                           # stop and delete the database volume
+```
+
+### Option B: Local install
+
+#### Requirements
 - PHP ≥ 8.2 with `pdo_mysql`, Composer 2
 - MySQL 8 or MariaDB 10.4+ (XAMPP works)
 - Node.js ≥ 18
 
-### Backend
+#### Backend
 
 ```bash
 cd backend
@@ -54,7 +86,7 @@ Run the backend tests (they use in-memory SQLite, so they need no MySQL):
 php artisan test
 ```
 
-### Frontend
+#### Frontend
 
 ```bash
 cd frontend
@@ -221,6 +253,7 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] Postman collection
 - [x] Email verification (6-digit code) before a booking is confirmed, plus a confirmation email with the cancellation code
 - [x] Real concurrency test against MySQL (`php artisan booking:race-test`)
+- [x] Deployable demo: `docker compose up --build` (MySQL 8 + Laravel + nginx)
 - [x] Automated backend tests (23 feature tests)
 
 ## 8. Assumptions

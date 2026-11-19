@@ -1,0 +1,52 @@
+# One-command demo:  docker compose up --build
+#   App:  http://localhost:8088          (React, /api proxied to Laravel)
+#   API:  http://localhost:8001/api      (direct, e.g. for Postman)
+# Admin: admin@example.com / Admin@123
+
+services:
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: event_booking
+      MYSQL_USER: booking
+      MYSQL_PASSWORD: booking_secret
+      MYSQL_ROOT_PASSWORD: root_secret
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - db-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot_secret"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    build: ./backend
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:8001
+      DB_CONNECTION: mysql
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: event_booking
+      DB_USERNAME: booking
+      DB_PASSWORD: booking_secret
+      MAIL_MAILER: log
+      BOOKING_EXPOSE_CODE: "true"   # demo only: shows the email code in the UI
+      LOG_CHANNEL: stderr           # logs (incl. "sent" emails) visible via: docker compose logs backend
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8001:8000"
+
+  frontend:
+    build: ./frontend
+    depends_on:
+      - backend
+    ports:
+      - "8088:80"
+
+volumes:
+  db-data:
