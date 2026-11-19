@@ -2,7 +2,7 @@
 
 React (Vite) frontend + Laravel 12 (PHP 8.2) REST API + MySQL.
 
-Users can browse events, register with name + email, and cancel. A person **cannot hold more than one booking on the same date**, and an event **cannot exceed `max_attendees`**. Both rules are enforced in the backend, inside a database transaction, with a database constraint as the final safeguard. Admins log in with a token to create and delete events.
+Users can browse events, register with name + email (confirmed by a 6-digit code sent to that email), and cancel. A person **cannot hold more than one booking on the same date**, and an event **cannot exceed `max_attendees`**. Both rules are enforced in the backend, inside a database transaction, with a database constraint as the final safeguard. Admins log in with a token to create and delete events.
 
 ```
 event-booking/
@@ -46,6 +46,8 @@ php artisan serve               # http://127.0.0.1:8000
 
 **Demo admin:** `admin@example.com` / `Admin@123`
 
+**Verification emails in local dev:** with `MAIL_MAILER=log`, the emails (verification code, booking confirmation) are written to `backend/storage/logs/laravel.log`. In addition, `BOOKING_EXPOSE_CODE=true` (set in `.env.example`, **for local demo only**) returns the code in the API response, and the UI shows it in a "Demo mode" box so the flow can be tested without a mailbox. To send real email, configure the `MAIL_*` SMTP settings and set `BOOKING_EXPOSE_CODE=false`.
+
 Run the backend tests (they use in-memory SQLite, so they need no MySQL):
 
 ```bash
@@ -79,7 +81,9 @@ Base URL: `http://127.0.0.1:8000/api`. Every response uses the same envelope:
 |---|---|---|---|
 | GET | `/events` | – | List events. Query: `date`, `from`, `to`, `search`, `include_past=1` (past events are hidden by default) |
 | GET | `/events/{id}` | – | Single event |
-| POST | `/registrations` | – | `{ event_id, name, email }`, returns the registration and a one-time `cancel_token` |
+| POST | `/registrations` | – | **Step 1.** `{ event_id, name, email }`. Checks the booking rules and emails a 6-digit code. Returns **202** with `verification_id`. No seat is taken yet |
+| POST | `/registrations/verify` | code | **Step 2.** `{ verification_id, code }`. Creates the booking. Returns **201** with the registration and a one-time `cancel_token` (also emailed) |
+| POST | `/registrations/verifications/{id}/resend` | – | New code (60 s cooldown, resets attempts) |
 | POST | `/registrations/{id}/cancel` | cancel token | `{ cancel_token }` |
 | POST | `/admin/login` | – | `{ email, password }`, returns a Bearer token (expires in 8 h) |
 | GET | `/admin/me` | Bearer | Current admin |
@@ -90,7 +94,7 @@ Base URL: `http://127.0.0.1:8000/api`. Every response uses the same envelope:
 
 Each event in the response includes computed fields: `registered_count`, `available_slots`, `is_full`, `is_past`.
 
-**HTTP status codes:** `201` created · `401` not logged in · `403` not admin · `404` not found · `409` business-rule conflict (same date / same event / full) · `422` validation (incl. past event) · `429` rate-limited.
+**HTTP status codes:** `201` created · `202` code sent · `401` not logged in · `403` not admin · `404` not found · `409` business-rule conflict (same date / same event / full / code already used) · `410` code expired · `422` validation (incl. past event, wrong code) · `429` rate-limited / too many wrong codes / resend cooldown.
 
 A Postman collection is in `postman/`. Run it top to bottom: its test scripts save the IDs and tokens into collection variables automatically.
 
@@ -112,6 +116,11 @@ personal_access_tokens     max_attendees                  active_event_date  = e
                                                           cancelled_at
                                                           UNIQUE (email, active_event_date)
                                                           INDEX  (event_id, status)
+
+registration_verifications   (pending bookings waiting for the email code)
+──────────────────────────
+id (UUID)  event_id → events  name  email  code_hash (HMAC-SHA256)  attempts
+expires_at  last_sent_at  verified_at  registration_id → registrations
 ```
 
 Design decisions:
@@ -119,6 +128,11 @@ Design decisions:
 - **Attendees have no accounts.** The requirement only asks for name + email, so the person is identified by their **normalised email** (trimmed, lower-cased): `Jane@X.com` and `jane@x.com` count as the same person.
 - **Available slots are calculated, not stored:** `max_attendees − COUNT(confirmed registrations)`. A cancellation therefore frees the seat automatically, and no counter can drift out of sync.
 - **`active_event_date` + UNIQUE index.** While a booking is confirmed, this column holds the event date. On cancellation it becomes `NULL`. Since MySQL allows any number of `NULL`s in a unique index, `UNIQUE(email, active_event_date)` means "at most one *confirmed* booking per email per date", enforced by the database itself. Cancelled rows stay in the table as history and never block a new booking.
+- **Email ownership is verified.** Because a person is identified only by their email, anyone could otherwise book with *someone else's* address and block that person's date. A booking is therefore created only after the 6-digit code emailed to that address is entered:
+  - Codes expire after 10 minutes and allow at most 5 wrong guesses. Resending has a 60 s cooldown and resets both.
+  - Only an HMAC of the code is stored, and the verification ID is an unguessable UUID.
+  - The booking rules are pre-checked **before** a code is sent, so users learn about "full" or "same date" right away. The real check runs again under the row lock when the code is verified.
+  - The wrong-attempt counter is committed *before* the error is returned. If the error were thrown inside the transaction, the increment would be rolled back and guesses would be unlimited.
 - **Cancellation without login.** On registration the API returns a random 40-character `cancel_token`, shown to the user once. Only its SHA-256 hash is stored. Cancelling requires booking ID + token. A missing booking and a wrong token return the same 404, so booking IDs cannot be enumerated.
 
 ---
@@ -135,6 +149,7 @@ Validation happens in layers. The frontend checks give quick feedback; the backe
 | Event is in the past | Button disabled ("Event ended") | `isPast()` check, returns 422 |
 | Same email already booked this event | Button shows "You're registered" | returns 409 *"You are already registered for this event."* |
 | Same email already booked another event that date | Checked against this browser's bookings before submit | App check + **UNIQUE index**, returns 409 *"You already registered for an event on this date."* |
+| Email belongs to the person booking | 6-digit code step, resend timer | `EmailVerificationService`: expiry 410, wrong code 422 with attempts left, 5 attempts then 429 |
 | Admin: title, date ≥ today, capacity ≥ 1 | `validateEvent()` | `StoreEventRequest` |
 
 All booking rules live in one place: `backend/app/Services/RegistrationService.php`.
@@ -204,7 +219,9 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] Race-condition handling (explained above)
 - [x] API authentication (Sanctum bearer tokens, rate limiting)
 - [x] Postman collection
-- [x] Automated backend tests (15 feature tests)
+- [x] Email verification (6-digit code) before a booking is confirmed, plus a confirmation email with the cancellation code
+- [x] Real concurrency test against MySQL (`php artisan booking:race-test`)
+- [x] Automated backend tests (23 feature tests)
 
 ## 8. Assumptions
 

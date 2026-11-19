@@ -1,210 +1,722 @@
 {
-  "info": {
-    "name": "Event Booking API",
-    "description": "Mini Event Booking System — Laravel API.\n\nRun the requests top-to-bottom: test scripts store `registrationId`, `cancelToken` and `adminToken` into collection variables automatically.\n\nAll responses use the envelope { success, message, data? , errors? }.",
-    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-  },
-  "variable": [
-    { "key": "baseUrl", "value": "http://127.0.0.1:8000/api" },
-    { "key": "eventId", "value": "1" },
-    { "key": "sameDateEventId", "value": "2" },
-    { "key": "registrationId", "value": "" },
-    { "key": "cancelToken", "value": "" },
-    { "key": "adminToken", "value": "" },
-    { "key": "newEventId", "value": "" }
-  ],
-  "item": [
-    {
-      "name": "Public",
-      "item": [
-        {
-          "name": "List events",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json" }],
-            "url": {
-              "raw": "{{baseUrl}}/events",
-              "host": ["{{baseUrl}}"], "path": ["events"],
-              "query": [
-                { "key": "date", "value": "2026-12-01", "disabled": true, "description": "Exact date YYYY-MM-DD" },
-                { "key": "from", "value": "2026-12-01", "disabled": true },
-                { "key": "to", "value": "2026-12-31", "disabled": true },
-                { "key": "search", "value": "react", "disabled": true, "description": "Title / venue" },
-                { "key": "include_past", "value": "1", "disabled": true }
-              ]
-            }
-          }
-        },
-        {
-          "name": "Get event",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/events/{{eventId}}", "host": ["{{baseUrl}}"], "path": ["events", "{{eventId}}"] }
-          }
-        },
-        {
-          "name": "Register (success)",
-          "event": [{
-            "listen": "test",
-            "script": { "exec": [
-              "const b = pm.response.json();",
-              "pm.test('201 Created', () => pm.response.to.have.status(201));",
-              "pm.test('success true', () => pm.expect(b.success).to.be.true);",
-              "if (b.success) {",
-              "  pm.collectionVariables.set('registrationId', b.data.registration.id);",
-              "  pm.collectionVariables.set('cancelToken', b.data.cancel_token);",
-              "}"
-            ] }
-          }],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"event_id\": {{eventId}},\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\"\n}" },
-            "url": { "raw": "{{baseUrl}}/registrations", "host": ["{{baseUrl}}"], "path": ["registrations"] }
-          }
-        },
-        {
-          "name": "Register again for SAME event (409)",
-          "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
-            "pm.test('message', () => pm.expect(pm.response.json().message).to.eql('You are already registered for this event.'));"
-          ] } }],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"event_id\": {{eventId}},\n  \"name\": \"Jane Doe\",\n  \"email\": \"JANE@example.com\"\n}" },
-            "url": { "raw": "{{baseUrl}}/registrations", "host": ["{{baseUrl}}"], "path": ["registrations"] }
-          }
-        },
-        {
-          "name": "Register for another event on SAME DATE (409)",
-          "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
-            "pm.test('message', () => pm.expect(pm.response.json().message).to.eql('You already registered for an event on this date.'));"
-          ] } }],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"event_id\": {{sameDateEventId}},\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\"\n}" },
-            "url": { "raw": "{{baseUrl}}/registrations", "host": ["{{baseUrl}}"], "path": ["registrations"] }
-          }
-        },
-        {
-          "name": "Register — validation errors (422)",
-          "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('422', () => pm.response.to.have.status(422));",
-            "pm.test('has errors', () => pm.expect(pm.response.json().errors).to.have.keys('name', 'email'));"
-          ] } }],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"event_id\": {{eventId}},\n  \"name\": \"\",\n  \"email\": \"not-an-email\"\n}" },
-            "url": { "raw": "{{baseUrl}}/registrations", "host": ["{{baseUrl}}"], "path": ["registrations"] }
-          }
-        },
-        {
-          "name": "Cancel registration",
-          "event": [{ "listen": "test", "script": { "exec": [
-            "pm.test('200', () => pm.response.to.have.status(200));",
-            "pm.test('cancelled', () => pm.expect(pm.response.json().data.status).to.eql('cancelled'));"
-          ] } }],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"cancel_token\": \"{{cancelToken}}\"\n}" },
-            "url": { "raw": "{{baseUrl}}/registrations/{{registrationId}}/cancel", "host": ["{{baseUrl}}"], "path": ["registrations", "{{registrationId}}", "cancel"] }
-          }
-        },
-        {
-          "name": "Cancel with wrong code (404)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"cancel_token\": \"wrong-code\"\n}" },
-            "url": { "raw": "{{baseUrl}}/registrations/{{registrationId}}/cancel", "host": ["{{baseUrl}}"], "path": ["registrations", "{{registrationId}}", "cancel"] }
-          }
-        }
-      ]
+    "info": {
+        "name": "Event Booking API",
+        "description": "Mini Event Booking System — Laravel API.\n\nRun the requests top-to-bottom: test scripts store `registrationId`, `cancelToken` and `adminToken` into collection variables automatically.\n\nAll responses use the envelope { success, message, data? , errors? }.\n\nBooking is two-step: POST /registrations emails a 6-digit code (returned as debug_code when BOOKING_EXPOSE_CODE=true), then POST /registrations/verify confirms it.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
-    {
-      "name": "Admin",
-      "item": [
+    "variable": [
         {
-          "name": "Login",
-          "event": [{ "listen": "test", "script": { "exec": [
-            "const b = pm.response.json();",
-            "pm.test('200', () => pm.response.to.have.status(200));",
-            "if (b.success) pm.collectionVariables.set('adminToken', b.data.token);"
-          ] } }],
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"Admin@123\"\n}" },
-            "url": { "raw": "{{baseUrl}}/admin/login", "host": ["{{baseUrl}}"], "path": ["admin", "login"] }
-          }
+            "key": "baseUrl",
+            "value": "http://127.0.0.1:8000/api"
         },
         {
-          "name": "Me",
-          "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
-            "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/admin/me", "host": ["{{baseUrl}}"], "path": ["admin", "me"] }
-          }
+            "key": "eventId",
+            "value": "1"
         },
         {
-          "name": "Create event",
-          "event": [{ "listen": "test", "script": { "exec": [
-            "const b = pm.response.json();",
-            "pm.test('201', () => pm.response.to.have.status(201));",
-            "if (b.success) pm.collectionVariables.set('newEventId', b.data.id);"
-          ] } }],
-          "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Postman Test Event\",\n  \"description\": \"Created from Postman\",\n  \"venue\": \"Online\",\n  \"event_date\": \"2026-12-31\",\n  \"start_time\": \"10:00\",\n  \"max_attendees\": 10\n}" },
-            "url": { "raw": "{{baseUrl}}/admin/events", "host": ["{{baseUrl}}"], "path": ["admin", "events"] }
-          }
+            "key": "sameDateEventId",
+            "value": "2"
         },
         {
-          "name": "Event registrations",
-          "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
-            "method": "GET",
-            "header": [{ "key": "Accept", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/admin/events/{{eventId}}/registrations", "host": ["{{baseUrl}}"], "path": ["admin", "events", "{{eventId}}", "registrations"] }
-          }
+            "key": "registrationId",
+            "value": ""
         },
         {
-          "name": "Delete event",
-          "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
-            "method": "DELETE",
-            "header": [{ "key": "Accept", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/admin/events/{{newEventId}}", "host": ["{{baseUrl}}"], "path": ["admin", "events", "{{newEventId}}"] }
-          }
+            "key": "cancelToken",
+            "value": ""
         },
         {
-          "name": "Create event without token (401)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
-            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Should fail\",\n  \"event_date\": \"2026-12-31\",\n  \"max_attendees\": 10\n}" },
-            "url": { "raw": "{{baseUrl}}/admin/events", "host": ["{{baseUrl}}"], "path": ["admin", "events"] }
-          }
+            "key": "adminToken",
+            "value": ""
         },
         {
-          "name": "Logout",
-          "request": {
-            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }] },
-            "method": "POST",
-            "header": [{ "key": "Accept", "value": "application/json" }],
-            "url": { "raw": "{{baseUrl}}/admin/logout", "host": ["{{baseUrl}}"], "path": ["admin", "logout"] }
-          }
+            "key": "newEventId",
+            "value": ""
+        },
+        {
+            "key": "verificationId",
+            "value": ""
+        },
+        {
+            "key": "code",
+            "value": ""
         }
-      ]
-    }
-  ]
+    ],
+    "item": [
+        {
+            "name": "Public",
+            "item": [
+                {
+                    "name": "List events",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/events",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "events"
+                            ],
+                            "query": [
+                                {
+                                    "key": "date",
+                                    "value": "2026-12-01",
+                                    "disabled": true,
+                                    "description": "Exact date YYYY-MM-DD"
+                                },
+                                {
+                                    "key": "from",
+                                    "value": "2026-12-01",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "to",
+                                    "value": "2026-12-31",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "search",
+                                    "value": "react",
+                                    "disabled": true,
+                                    "description": "Title / venue"
+                                },
+                                {
+                                    "key": "include_past",
+                                    "value": "1",
+                                    "disabled": true
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Get event",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/events/{{eventId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "events",
+                                "{{eventId}}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Register step 1 — request code (202)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const b = pm.response.json();",
+                                    "pm.test('202 Accepted', () => pm.response.to.have.status(202));",
+                                    "if (b.success) {",
+                                    "  pm.collectionVariables.set('verificationId', b.data.verification_id);",
+                                    "  // Only present when BOOKING_EXPOSE_CODE=true; otherwise copy it from storage/logs/laravel.log",
+                                    "  if (b.data.debug_code) pm.collectionVariables.set('code', b.data.debug_code);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"event_id\": {{eventId}},\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/registrations",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "registrations"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Verify with wrong code (422, attempts left)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"verification_id\": \"{{verificationId}}\",\n  \"code\": \"000000\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/registrations/verify",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "registrations",
+                                "verify"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Resend code (429 within 60s cooldown)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/registrations/verifications/{{verificationId}}/resend",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "registrations",
+                                "verifications",
+                                "{{verificationId}}",
+                                "resend"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Register step 2 — verify code (201)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const b = pm.response.json();",
+                                    "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                                    "pm.test('Registered successfully.', () => pm.expect(b.message).to.eql('Registered successfully.'));",
+                                    "if (b.success) {",
+                                    "  pm.collectionVariables.set('registrationId', b.data.registration.id);",
+                                    "  pm.collectionVariables.set('cancelToken', b.data.cancel_token);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"verification_id\": \"{{verificationId}}\",\n  \"code\": \"{{code}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/registrations/verify",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "registrations",
+                                "verify"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Register again for SAME event (409)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                                    "pm.test('message', () => pm.expect(pm.response.json().message).to.eql('You are already registered for this event.'));"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"event_id\": {{eventId}},\n  \"name\": \"Jane Doe\",\n  \"email\": \"JANE@example.com\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/registrations",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "registrations"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Register for another event on SAME DATE (409)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('409 Conflict', () => pm.response.to.have.status(409));",
+                                    "pm.test('message', () => pm.expect(pm.response.json().message).to.eql('You already registered for an event on this date.'));"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"event_id\": {{sameDateEventId}},\n  \"name\": \"Jane Doe\",\n  \"email\": \"jane@example.com\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/registrations",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "registrations"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Register — validation errors (422)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('422', () => pm.response.to.have.status(422));",
+                                    "pm.test('has errors', () => pm.expect(pm.response.json().errors).to.have.keys('name', 'email'));"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"event_id\": {{eventId}},\n  \"name\": \"\",\n  \"email\": \"not-an-email\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/registrations",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "registrations"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Cancel registration",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test('200', () => pm.response.to.have.status(200));",
+                                    "pm.test('cancelled', () => pm.expect(pm.response.json().data.status).to.eql('cancelled'));"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"cancel_token\": \"{{cancelToken}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/registrations/{{registrationId}}/cancel",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "registrations",
+                                "{{registrationId}}",
+                                "cancel"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Cancel with wrong code (404)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"cancel_token\": \"wrong-code\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/registrations/{{registrationId}}/cancel",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "registrations",
+                                "{{registrationId}}",
+                                "cancel"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "Admin",
+            "item": [
+                {
+                    "name": "Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const b = pm.response.json();",
+                                    "pm.test('200', () => pm.response.to.have.status(200));",
+                                    "if (b.success) pm.collectionVariables.set('adminToken', b.data.token);"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"Admin@123\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/admin/login",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "login"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Me",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{adminToken}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/admin/me",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "me"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Create event",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const b = pm.response.json();",
+                                    "pm.test('201', () => pm.response.to.have.status(201));",
+                                    "if (b.success) pm.collectionVariables.set('newEventId', b.data.id);"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{adminToken}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"Postman Test Event\",\n  \"description\": \"Created from Postman\",\n  \"venue\": \"Online\",\n  \"event_date\": \"2026-12-31\",\n  \"start_time\": \"10:00\",\n  \"max_attendees\": 10\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/admin/events",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "events"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Event registrations",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{adminToken}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/admin/events/{{eventId}}/registrations",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "events",
+                                "{{eventId}}",
+                                "registrations"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Delete event",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{adminToken}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "DELETE",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/admin/events/{{newEventId}}",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "events",
+                                "{{newEventId}}"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Create event without token (401)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"title\": \"Should fail\",\n  \"event_date\": \"2026-12-31\",\n  \"max_attendees\": 10\n}"
+                        },
+                        "url": {
+                            "raw": "{{baseUrl}}/admin/events",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "events"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{adminToken}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Accept",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{baseUrl}}/admin/logout",
+                            "host": [
+                                "{{baseUrl}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "logout"
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
 }

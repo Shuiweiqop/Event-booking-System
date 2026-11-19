@@ -6,6 +6,8 @@ use App\Http\Controllers\Concerns\RespondsWithJson;
 use App\Http\Requests\StoreRegistrationRequest;
 use App\Http\Resources\RegistrationResource;
 use App\Models\Event;
+use App\Models\RegistrationVerification;
+use App\Services\EmailVerificationService;
 use App\Services\RegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,22 +16,70 @@ class RegistrationController extends Controller
 {
     use RespondsWithJson;
 
-    public function __construct(private readonly RegistrationService $service) {}
+    public function __construct(
+        private readonly RegistrationService $service,
+        private readonly EmailVerificationService $verification,
+    ) {}
 
-    /** POST /api/registrations  { event_id, name, email } */
+    /**
+     * Step 1 — POST /api/registrations  { event_id, name, email }
+     * Checks the booking rules and emails a one-time code. No seat is taken yet.
+     */
     public function store(StoreRegistrationRequest $request): JsonResponse
     {
-        [$registration, $cancelToken] = $this->service->register(
+        [$verification, $code] = $this->verification->request(
             (int) $request->validated('event_id'),
             $request->validated('name'),
             $request->validated('email'),
         );
 
+        return $this->ok(
+            "We sent a 6-digit code to {$verification->maskedEmail()}. Enter it to confirm your booking.",
+            $this->verificationPayload($verification, $code),
+            202,
+        );
+    }
+
+    /** Step 2 — POST /api/registrations/verify  { verification_id, code } */
+    public function verify(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'verification_id' => ['required', 'uuid'],
+            'code' => ['required', 'string', 'regex:/^\s*\d{6}\s*$/'],
+        ], ['code.regex' => 'The code must be 6 digits.']);
+
+        [$registration, $cancelToken] = $this->verification->verify($data['verification_id'], $data['code']);
+
         return $this->ok('Registered successfully.', [
             'registration' => new RegistrationResource($registration),
-            // Shown once; required to cancel. Only its SHA-256 hash is stored.
+            // Shown once (and emailed); required to cancel. Only its SHA-256 hash is stored.
             'cancel_token' => $cancelToken,
         ], 201);
+    }
+
+    /** POST /api/registrations/verifications/{id}/resend */
+    public function resend(string $id): JsonResponse
+    {
+        [$verification, $code] = $this->verification->resend($id);
+
+        return $this->ok("A new code was sent to {$verification->maskedEmail()}.", $this->verificationPayload($verification, $code));
+    }
+
+    private function verificationPayload(RegistrationVerification $v, string $code): array
+    {
+        $payload = [
+            'verification_id' => $v->id,
+            'email_masked' => $v->maskedEmail(),
+            'expires_at' => $v->expires_at->toIso8601String(),
+            'resend_available_at' => $v->last_sent_at
+                ->copy()->addSeconds(config('booking.verification.resend_cooldown_seconds'))->toIso8601String(),
+        ];
+
+        if (config('booking.verification.expose_code')) {
+            $payload['debug_code'] = $code; // local demo only — see config/booking.php
+        }
+
+        return $payload;
     }
 
     /** POST /api/registrations/{id}/cancel  { cancel_token } */

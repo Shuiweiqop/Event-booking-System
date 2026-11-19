@@ -101,6 +101,31 @@ CREATE TABLE `registrations` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------
+-- registration_verifications: pending bookings waiting for the emailed code.
+-- A row in `registrations` is created only after the correct code is entered.
+-- ---------------------------------------------------------------------
+CREATE TABLE `registration_verifications` (
+  `id`              char(36) NOT NULL,                   -- UUID, unguessable
+  `event_id`        bigint unsigned NOT NULL,
+  `name`            varchar(100) NOT NULL,
+  `email`           varchar(150) NOT NULL,
+  `code_hash`       char(64) NOT NULL,                   -- HMAC-SHA256(code, APP_KEY)
+  `attempts`        tinyint unsigned NOT NULL DEFAULT 0, -- max 5 wrong guesses
+  `expires_at`      datetime NOT NULL,                   -- 10 minutes
+  `last_sent_at`    datetime NOT NULL,                   -- resend cooldown
+  `verified_at`     datetime DEFAULT NULL,
+  `registration_id` bigint unsigned DEFAULT NULL,
+  `created_at`      timestamp NULL DEFAULT NULL,
+  `updated_at`      timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `registration_verifications_email_created_at_index` (`email`, `created_at`),
+  CONSTRAINT `registration_verifications_event_id_foreign`
+    FOREIGN KEY (`event_id`) REFERENCES `events` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `registration_verifications_registration_id_foreign`
+    FOREIGN KEY (`registration_id`) REFERENCES `registrations` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
 -- Sample data
 -- Admin login: admin@example.com / Admin@123
 -- ---------------------------------------------------------------------

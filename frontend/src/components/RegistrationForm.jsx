@@ -6,10 +6,13 @@ import { firstErrors, validateRegistration } from '../utils/validation'
 import Alert from './Alert'
 import InputField from './InputField'
 import Spinner from './Spinner'
+import VerifyCodeStep from './VerifyCodeStep'
 
 /**
- * Registration form for one event.
- * Flow: client validation -> local same-date hint -> POST -> success / server error.
+ * Registration for one event, in three steps:
+ *   details  -> client validation, local same-date hint, POST /registrations (emails a code)
+ *   verify   -> enter the code (VerifyCodeStep), POST /registrations/verify
+ *   done     -> confirmation with booking ID + cancellation code
  * The server is the source of truth for every rule; client checks just save a round-trip.
  */
 export default function RegistrationForm({ event, onSuccess, onClose }) {
@@ -17,6 +20,7 @@ export default function RegistrationForm({ event, onSuccess, onClose }) {
   const [errors, setErrors] = useState({})
   const [serverError, setServerError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const [pending, setPending] = useState(null) // verification in progress
   const [result, setResult] = useState(null)
   const { addBooking, findConflict } = useMyBookings()
 
@@ -47,10 +51,8 @@ export default function RegistrationForm({ event, onSuccess, onClose }) {
     setSubmitting(true)
     setServerError(null)
     try {
-      const body = await registrationsApi.create({ eventId: event.id, name: form.name.trim(), email: form.email.trim() })
-      addBooking(body.data.registration, body.data.cancel_token)
-      setResult(body)
-      onSuccess?.()
+      const body = await registrationsApi.requestCode({ eventId: event.id, name: form.name.trim(), email: form.email.trim() })
+      setPending(body.data)
     } catch (err) {
       setErrors(firstErrors(err.errors))
       setServerError(err.message)
@@ -59,6 +61,27 @@ export default function RegistrationForm({ event, onSuccess, onClose }) {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleVerified = (body) => {
+    addBooking(body.data.registration, body.data.cancel_token)
+    setResult(body)
+    onSuccess?.()
+  }
+
+  if (pending && !result) {
+    return (
+      <>
+        <EventSummary event={event} />
+        <VerifyCodeStep
+          pending={pending}
+          onPendingChange={setPending}
+          onVerified={handleVerified}
+          onBack={() => setPending(null)}
+          onRefreshEvents={onSuccess}
+        />
+      </>
+    )
   }
 
   if (result) {
@@ -75,8 +98,8 @@ export default function RegistrationForm({ event, onSuccess, onClose }) {
           <dt>Cancellation code</dt><dd><code className="code">{result.data.cancel_token}</code></dd>
         </dl>
         <p className="muted small">
-          This booking is saved under <strong>My Bookings</strong> in this browser. Keep the cancellation code if you
-          may need to cancel from another device.
+          This booking is saved under <strong>My Bookings</strong> in this browser. The booking ID and cancellation code
+          were also emailed to you, so you can cancel from another device.
         </p>
         <div className="form-actions">
           <button type="button" className="btn btn--primary" onClick={onClose}>Done</button>
@@ -87,14 +110,7 @@ export default function RegistrationForm({ event, onSuccess, onClose }) {
 
   return (
     <form onSubmit={handleSubmit} noValidate>
-      <div className="event-summary">
-        <strong>{event.title}</strong>
-        <span>
-          {formatDate(event.event_date)}
-          {event.start_time && ` · ${formatTime(event.start_time)}`} · {event.available_slots} slot
-          {event.available_slots === 1 ? '' : 's'} left
-        </span>
-      </div>
+      <EventSummary event={event} />
 
       {serverError && <Alert type="error" title="Registration failed">{serverError}</Alert>}
 
@@ -107,9 +123,22 @@ export default function RegistrationForm({ event, onSuccess, onClose }) {
       <div className="form-actions">
         <button type="button" className="btn btn--ghost" onClick={onClose} disabled={submitting}>Cancel</button>
         <button type="submit" className="btn btn--primary" disabled={submitting}>
-          {submitting ? <><Spinner inline /> Registering…</> : 'Confirm registration'}
+          {submitting ? <><Spinner inline /> Sending code…</> : 'Send verification code'}
         </button>
       </div>
     </form>
+  )
+}
+
+function EventSummary({ event }) {
+  return (
+    <div className="event-summary">
+      <strong>{event.title}</strong>
+      <span>
+        {formatDate(event.event_date)}
+        {event.start_time && ` · ${formatTime(event.start_time)}`} · {event.available_slots} slot
+        {event.available_slots === 1 ? '' : 's'} left
+      </span>
+    </div>
   )
 }

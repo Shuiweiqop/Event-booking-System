@@ -24,12 +24,15 @@ app/
 │   ├── Middleware/EnsureUserIsAdmin.php     `admin` route middleware
 │   ├── Requests/                            StoreRegistrationRequest, StoreEventRequest
 │   └── Resources/                           EventResource (computes available_slots), RegistrationResource
-├── Models/                                  Event, Registration, User
+├── Models/                                  Event, Registration, RegistrationVerification, User
 ├── Providers/AppServiceProvider.php         rate limiters (bookings, login)
-└── Services/RegistrationService.php         ★ all booking rules + transaction / locking
+├── Services/RegistrationService.php         ★ all booking rules + transaction / locking
+├── Services/EmailVerificationService.php    two-step booking: email code → verify → book
+├── Mail/                                    VerificationCodeMail, BookingConfirmedMail (text views in resources/views/mail)
+└── Console/Commands/RaceTestCommand.php     booking:race-test (real concurrency test)
 bootstrap/app.php                            routes + JSON error rendering for /api/*
-database/migrations/                         schema (events, registrations, is_admin)
+database/migrations/                         schema (events, registrations, registration_verifications, is_admin)
 database/seeders/DatabaseSeeder.php          demo admin + sample events
 routes/api.php                               route definitions
-tests/Feature/RegistrationTest.php           15 feature tests
+tests/Feature/RegistrationTest.php           23 feature tests
 ```

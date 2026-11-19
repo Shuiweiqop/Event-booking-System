@@ -27,13 +27,15 @@ src/
 ├── components/
 │   ├── EventCard.jsx        title, date, slots bar, register button (disabled when full/past/booked)
 │   ├── EventFilters.jsx     debounced search + date filter
-│   ├── RegistrationForm.jsx name/email form, validation, confirmation screen
+│   ├── RegistrationForm.jsx details → verify code → confirmation (3 steps)
+│   ├── VerifyCodeStep.jsx   6-digit code input, attempts/expiry errors, resend countdown
 │   ├── InputField.jsx       label + input + inline error (accessible)
 │   ├── Modal.jsx, Alert.jsx, Spinner.jsx, EmptyState.jsx, Navbar.jsx
 ├── context/AuthContext.jsx  admin token state, login / logout
 ├── hooks/
 │   ├── useEvents.js         fetch + loading/error + refetch, aborts stale requests
-│   └── useMyBookings.js     localStorage bookings, synced across tabs
+│   ├── useMyBookings.js     localStorage bookings, synced across tabs
+│   └── useCountdown.js      seconds-left timer (resend cooldown)
 ├── pages/                   EventsPage, MyBookingsPage, AdminLoginPage, AdminDashboardPage
 ├── utils/                   format.js (dates), validation.js
 ├── App.jsx                  routes

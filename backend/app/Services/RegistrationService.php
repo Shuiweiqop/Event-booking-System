@@ -42,25 +42,7 @@ class RegistrationService
                 /** @var Event $event */
                 $event = Event::query()->whereKey($eventId)->lockForUpdate()->firstOrFail();
 
-                if ($event->isPast()) {
-                    throw new BookingException(self::MSG_PAST, 422);
-                }
-
-                $existing = Registration::query()
-                    ->where('email', $email)
-                    ->where('active_event_date', $event->event_date->toDateString())
-                    ->first();
-
-                if ($existing) {
-                    throw new BookingException(
-                        $existing->event_id === $event->id ? self::MSG_SAME_EVENT : self::MSG_SAME_DATE
-                    );
-                }
-
-                $confirmed = $event->confirmedRegistrations()->count();
-                if ($confirmed >= $event->max_attendees) {
-                    throw new BookingException(self::MSG_FULL);
-                }
+                $this->assertBookable($event, $email);
 
                 return $event->registrations()->create([
                     'name' => $name,
@@ -77,6 +59,37 @@ class RegistrationService
         }
 
         return [$registration->load('event'), $plainToken];
+    }
+
+    /**
+     * The booking rules: event not past, person not already booked that date, seats left.
+     * Called without a lock as a pre-check (before sending a verification code) and again
+     * under the row lock inside register(), which is the check that actually counts.
+     *
+     * @throws BookingException
+     */
+    public function assertBookable(Event $event, string $email): void
+    {
+        $email = self::normaliseEmail($email);
+
+        if ($event->isPast()) {
+            throw new BookingException(self::MSG_PAST, 422);
+        }
+
+        $existing = Registration::query()
+            ->where('email', $email)
+            ->where('active_event_date', $event->event_date->toDateString())
+            ->first();
+
+        if ($existing) {
+            throw new BookingException(
+                $existing->event_id === $event->id ? self::MSG_SAME_EVENT : self::MSG_SAME_DATE
+            );
+        }
+
+        if ($event->confirmedRegistrations()->count() >= $event->max_attendees) {
+            throw new BookingException(self::MSG_FULL);
+        }
     }
 
     public function cancel(int $registrationId, string $plainToken): Registration

@@ -2,16 +2,26 @@
 
 namespace Tests\Feature;
 
+use App\Mail\BookingConfirmedMail;
+use App\Mail\VerificationCodeMail;
 use App\Models\Event;
 use App\Models\Registration;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class RegistrationTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Mail::fake();
+        config(['booking.verification.expose_code' => false]);
+    }
 
     private function makeEvent(array $attrs = []): Event
     {
@@ -22,9 +32,30 @@ class RegistrationTest extends TestCase
         ], $attrs));
     }
 
-    private function register(Event $event, string $email = 'jane@example.com', string $name = 'Jane')
+    /** Step 1 only: request a verification code. */
+    private function requestCode(Event $event, string $email = 'jane@example.com', string $name = 'Jane')
     {
         return $this->postJson('/api/registrations', ['event_id' => $event->id, 'name' => $name, 'email' => $email]);
+    }
+
+    /** The code from the most recent verification email (read from the faked mailer). */
+    private function lastCode(): string
+    {
+        return Mail::sent(VerificationCodeMail::class)->last()->code;
+    }
+
+    /** Full flow: request code + verify. Returns the step-1 response if it was rejected. */
+    private function register(Event $event, string $email = 'jane@example.com', string $name = 'Jane')
+    {
+        $res = $this->requestCode($event, $email, $name);
+        if ($res->status() !== 202) {
+            return $res;
+        }
+
+        return $this->postJson('/api/registrations/verify', [
+            'verification_id' => $res->json('data.verification_id'),
+            'code' => $this->lastCode(),
+        ]);
     }
 
     public function test_lists_upcoming_events_with_available_slots(): void
@@ -176,5 +207,101 @@ class RegistrationTest extends TestCase
         $this->withToken($token)->deleteJson("/api/admin/events/{$id}")->assertOk();
         $this->assertDatabaseMissing('events', ['id' => $id]);
         $this->assertDatabaseCount('registrations', 0);
+    }
+
+    /* ------------------------------------------------------------------
+     | Email verification
+     * ------------------------------------------------------------------ */
+
+    public function test_requesting_a_code_emails_it_and_does_not_book_yet(): void
+    {
+        $event = $this->makeEvent();
+
+        $this->requestCode($event, 'jane@example.com')
+            ->assertStatus(202)
+            ->assertJson(['success' => true])
+            ->assertJsonPath('data.email_masked', 'j***@example.com')
+            ->assertJsonMissingPath('data.debug_code');
+
+        Mail::assertSent(VerificationCodeMail::class, fn ($m) => $m->hasTo('jane@example.com') && strlen($m->code) === 6);
+        $this->assertDatabaseCount('registrations', 0);
+        $this->assertDatabaseMissing('registration_verifications', ['code_hash' => $this->lastCode()]); // never stored in plain text
+    }
+
+    public function test_booking_rules_are_checked_before_sending_a_code(): void
+    {
+        $event = $this->makeEvent(['max_attendees' => 1]);
+        $this->register($event, 'a@example.com')->assertCreated();
+
+        $this->requestCode($event, 'b@example.com')->assertStatus(409)->assertJson(['message' => 'Sorry, this event is fully booked.']);
+        Mail::assertSentCount(2); // only a@'s code + confirmation, nothing for b@
+    }
+
+    public function test_successful_verification_books_and_emails_confirmation(): void
+    {
+        $res = $this->register($this->makeEvent())->assertCreated()->assertJsonPath('data.registration.status', 'confirmed');
+
+        Mail::assertSent(BookingConfirmedMail::class, fn ($m) => $m->cancelToken === $res->json('data.cancel_token'));
+    }
+
+    public function test_wrong_code_is_counted_and_locks_after_max_attempts(): void
+    {
+        $id = $this->requestCode($this->makeEvent())->json('data.verification_id');
+        $correct = $this->lastCode();
+        $wrong = $correct === '000000' ? '111111' : '000000';
+
+        for ($left = 4; $left >= 1; $left--) {
+            $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $wrong])
+                ->assertStatus(422)->assertJson(['message' => "Incorrect code. {$left} attempt(s) left."]);
+        }
+        $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $wrong])->assertStatus(429);
+
+        // Even the right code is refused now — brute force is capped at 5 guesses.
+        $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $correct])->assertStatus(429);
+        $this->assertDatabaseCount('registrations', 0);
+    }
+
+    public function test_expired_code_is_rejected(): void
+    {
+        $id = $this->requestCode($this->makeEvent())->json('data.verification_id');
+        $code = $this->lastCode();
+
+        $this->travel(11)->minutes();
+
+        $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $code])->assertStatus(410);
+    }
+
+    public function test_code_cannot_be_used_twice(): void
+    {
+        $id = $this->requestCode($this->makeEvent())->json('data.verification_id');
+        $code = $this->lastCode();
+
+        $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $code])->assertCreated();
+        $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $code])->assertStatus(409);
+    }
+
+    public function test_resend_has_cooldown_and_invalidates_old_code(): void
+    {
+        $id = $this->requestCode($this->makeEvent())->json('data.verification_id');
+        $oldCode = $this->lastCode();
+
+        $this->postJson("/api/registrations/verifications/{$id}/resend")->assertStatus(429);
+
+        $this->travel(61)->seconds();
+        $this->postJson("/api/registrations/verifications/{$id}/resend")->assertOk();
+        $newCode = $this->lastCode();
+
+        if ($newCode !== $oldCode) {
+            $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $oldCode])->assertStatus(422);
+        }
+        $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $newCode])->assertCreated();
+    }
+
+    public function test_debug_code_is_only_exposed_when_enabled(): void
+    {
+        config(['booking.verification.expose_code' => true]);
+
+        $res = $this->requestCode($this->makeEvent())->assertStatus(202);
+        $this->assertSame($this->lastCode(), $res->json('data.debug_code'));
     }
 }

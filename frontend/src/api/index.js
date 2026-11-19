@@ -9,8 +9,14 @@ export const eventsApi = {
 }
 
 export const registrationsApi = {
-  create: ({ eventId, name, email }) =>
+  // Step 1: checks the rules and emails a 6-digit code (no seat taken yet).
+  requestCode: ({ eventId, name, email }) =>
     unwrap(client.post('/registrations', { event_id: eventId, name, email })),
+  // Step 2: confirms the booking.
+  verify: (verificationId, code) =>
+    unwrap(client.post('/registrations/verify', { verification_id: verificationId, code })),
+  resendCode: (verificationId) =>
+    unwrap(client.post(`/registrations/verifications/${verificationId}/resend`)),
   cancel: (id, cancelToken) =>
     unwrap(client.post(`/registrations/${id}/cancel`, { cancel_token: cancelToken })),
 }
