@@ -16,7 +16,7 @@ npm test                 # unit tests (Vitest + Testing Library)
 | Route | Page |
 |---|---|
 | `/` | Event listing with search, date filter and "show past"; opens a registration modal |
-| `/my-bookings` | Bookings made in this browser; cancel, or cancel any booking with ID + code |
+| `/my-bookings` | Bookings made in this browser, refreshed from the server: **Upcoming** (soonest first, with Cancel) and a collapsible **History** (past, cancelled, removed). Cancel any booking with ID + code |
 | `/cancel?id=…&token=…` | Landing page for the cancel link in the confirmation email: shows the booking, cancels only after an explicit click |
 | `/admin` | Admin login, then dashboard (create, edit and delete events; view attendees). Not linked for visitors: the navbar shows "Admin" and "Log out" only after an admin logs in |
 
@@ -49,7 +49,8 @@ src/
 │   └── useCountdown.js      seconds-left timer (resend cooldown)
 ├── pages/                   EventsPage, MyBookingsPage, CancelBookingPage (+ test), AdminLoginPage, AdminDashboardPage
 ├── test/setup.js            jest-dom matchers + cleanup between tests
-├── utils/                   format.js (dates), validation.js, pagination.js (page list), eventForm.js
+├── utils/                   format.js (dates, app timezone), validation.js, pagination.js, eventForm.js,
+│                            bookings.js (upcoming / history grouping)
 ├── App.jsx                  routes
 └── main.jsx
 ```

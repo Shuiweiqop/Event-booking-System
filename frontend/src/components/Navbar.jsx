@@ -1,11 +1,14 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import useMyBookings from '../hooks/useMyBookings'
+import { groupBookings } from '../utils/bookings'
+import { todayYmd } from '../utils/format'
 
 export default function Navbar() {
   const { isAdmin, logout } = useAuth()
   const { bookings } = useMyBookings()
-  const active = bookings.filter((b) => b.status === 'confirmed').length
+  // Badge = upcoming bookings only (a confirmed booking for a past event is history).
+  const active = groupBookings(bookings, todayYmd()).upcoming.length
 
   return (
     <header className="navbar">

@@ -368,7 +368,7 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] One-click-safe cancel link in the confirmation email: `/cancel?id=…&token=…` opens a confirmation page, and only the explicit button cancels
 - [x] API documentation: OpenAPI 3 spec + Swagger UI at `/api/docs`, kept in sync with the routes by a test
 - [x] Housekeeping: abandoned email verifications are pruned daily (`MassPrunable` + scheduler); dialogs trap focus and return it to the opener
-- [x] Automated tests: 55 backend tests (50 feature + 5 unit, PHPUnit) + 50 frontend unit tests (Vitest)
+- [x] Automated tests: 55 backend tests (50 feature + 5 unit, PHPUnit) + 58 frontend unit tests (Vitest)
 - [x] Continuous integration (GitHub Actions): backend tests, the MySQL 8 concurrency test, frontend lint/tests/build and the Docker build on every push
 
 ## 8. Assumptions
@@ -404,5 +404,5 @@ A likely design: a nullable `checked_in_at` (+ `checked_in_by`) column on `regis
 ### Other ideas
 - **Waitlist**: when an event is full, join a queue and get the freed seat automatically on cancellation (inside the same row lock).
 - **Online hosting**: a public demo (e.g. Railway with MySQL). It would need a scheduled data reset and a non-public admin password, because the demo credentials are in this README.
-- **User accounts (optional)**: "My Bookings" across devices without cancel codes, while keeping guest booking.
+- **Booking history across devices**: "My Bookings" (upcoming + history) is kept per browser and refreshed from the server. To see it on any device without accounts: enter your email, receive a one-time code (reusing the verification flow and its rate limits), then list every booking for that email. Optional user accounts would replace this, while keeping guest booking.
 - **Reminder emails** the day before the event (scheduler + queue).

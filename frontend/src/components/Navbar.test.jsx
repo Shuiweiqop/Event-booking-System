@@ -32,10 +32,13 @@ describe('<Navbar />', () => {
     expect(logout).toHaveBeenCalled()
   })
 
-  it('shows how many active bookings this browser holds', () => {
+  it('badge counts upcoming bookings only (not cancelled, not past)', () => {
     useAuth.mockReturnValue({ isAdmin: false, logout: vi.fn() })
     localStorage.setItem('eventhub.bookings', JSON.stringify([
-      { id: 1, status: 'confirmed' }, { id: 2, status: 'cancelled' }, { id: 3, status: 'confirmed' },
+      { id: 1, status: 'confirmed', event_date: '2099-01-01' },
+      { id: 2, status: 'cancelled', event_date: '2099-01-02' },
+      { id: 3, status: 'confirmed', event_date: '2099-01-03' },
+      { id: 4, status: 'confirmed', event_date: '2000-01-01' }, // past
     ]))
     renderNavbar()
 

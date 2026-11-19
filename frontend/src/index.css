@@ -241,3 +241,11 @@ code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .cancel-card h1 { font-size: 1.5rem; margin-bottom: 1.1rem; }
 .cancel-card > .btn { margin-top: .25rem; }
 .form-actions--start { justify-content: flex-start; flex-wrap: wrap; }
+
+/* ---------- My bookings: upcoming / history ---------- */
+.booking-group { margin-bottom: 1.5rem; }
+.booking-group__title { font-size: 1.05rem; font-weight: 700; margin: 0 0 .75rem; }
+.booking-history > summary { cursor: pointer; list-style-position: inside; }
+.booking-history[open] > summary { margin-bottom: .75rem; }
+.pill--past { background: #eeece6; color: var(--muted); }
+.booking--past { opacity: .75; }

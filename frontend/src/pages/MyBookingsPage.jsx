@@ -6,6 +6,7 @@ import EmptyState from '../components/EmptyState'
 import InputField from '../components/InputField'
 import Spinner from '../components/Spinner'
 import useMyBookings from '../hooks/useMyBookings'
+import { groupBookings } from '../utils/bookings'
 import { formatDate, todayYmd } from '../utils/format'
 
 export default function MyBookingsPage() {
@@ -38,7 +39,35 @@ export default function MyBookingsPage() {
     }
   }
 
-  const today = todayYmd()
+  const { upcoming, history } = groupBookings(bookings, todayYmd())
+
+  const renderItem = (b) => (
+    <li key={b.id} className={`booking ${['cancelled', 'removed'].includes(b.displayStatus) ? 'booking--cancelled' : b.displayStatus === 'past' ? 'booking--past' : ''}`}>
+      <div>
+        <strong>{b.event?.title ?? `Event #${b.event_id}`}</strong>
+        <p className="muted small">
+          {formatDate(b.event_date)} · Booking #{b.id} · {b.email}
+        </p>
+        {b.status === 'removed' && (
+          <p className="small text-warn">This event was removed by the organiser.</p>
+        )}
+      </div>
+      <div className="booking__actions">
+        <span className={`pill pill--${b.displayStatus}`}>{b.displayStatus}</span>
+        {b.displayStatus === 'confirmed' ? (
+          <button type="button" className="btn btn--danger btn--sm" disabled={busyId === b.id}
+            onClick={() => cancel(b)}>
+            {busyId === b.id ? <Spinner inline /> : 'Cancel'}
+          </button>
+        ) : (
+          <button type="button" className="btn btn--ghost btn--sm" onClick={() => removeBooking(b.id)}
+            aria-label={`Remove booking #${b.id} from this list`}>
+            Remove
+          </button>
+        )}
+      </div>
+    </li>
+  )
 
   return (
     <section className="container narrow">
@@ -55,37 +84,30 @@ export default function MyBookingsPage() {
       {bookings.length === 0 ? (
         <EmptyState title="No bookings yet" action={<Link className="btn btn--primary" to="/">Browse events</Link>} />
       ) : (
-        <ul className="booking-list">
-          {bookings.map((b) => {
-            const past = b.event_date < today
-            return (
-              <li key={b.id} className={`booking ${b.status !== 'confirmed' ? 'booking--cancelled' : ''}`}>
-                <div>
-                  <strong>{b.event?.title ?? `Event #${b.event_id}`}</strong>
-                  <p className="muted small">
-                    {formatDate(b.event_date)} · Booking #{b.id} · {b.email}
-                  </p>
-                  {b.status === 'removed' && (
-                    <p className="small text-warn">This event was removed by the organiser.</p>
-                  )}
-                </div>
-                <div className="booking__actions">
-                  <span className={`pill pill--${b.status}`}>{b.status}</span>
-                  {b.status === 'confirmed' && !past ? (
-                    <button type="button" className="btn btn--danger btn--sm" disabled={busyId === b.id}
-                      onClick={() => cancel(b)}>
-                      {busyId === b.id ? <Spinner inline /> : 'Cancel'}
-                    </button>
-                  ) : (
-                    <button type="button" className="btn btn--ghost btn--sm" onClick={() => removeBooking(b.id)}>
-                      Remove
-                    </button>
-                  )}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
+        <>
+          <section aria-labelledby="upcoming-heading" className="booking-group">
+            <h2 id="upcoming-heading" className="booking-group__title">
+              Upcoming <span className="muted">({upcoming.length})</span>
+            </h2>
+            {upcoming.length === 0 ? (
+              <p className="muted">
+                No upcoming bookings. <Link to="/">Browse events</Link>
+              </p>
+            ) : (
+              <ul className="booking-list">{upcoming.map(renderItem)}</ul>
+            )}
+          </section>
+
+          {history.length > 0 && (
+            <details className="booking-group booking-history">
+              <summary className="booking-group__title">
+                History <span className="muted">({history.length})</span>
+                <span className="muted small"> · past, cancelled and removed</span>
+              </summary>
+              <ul className="booking-list">{history.map(renderItem)}</ul>
+            </details>
+          )}
+        </>
       )}
 
       <CancelByCode onCancelled={markCancelled} />
