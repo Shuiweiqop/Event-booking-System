@@ -7,6 +7,17 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
+| API documentation:  /api/docs (Swagger UI)  ·  /api/openapi.yaml (spec)
+|--------------------------------------------------------------------------
+*/
+Route::get('/openapi.yaml', fn () => response(file_get_contents(base_path('docs/openapi.yaml')), 200, [
+    'Content-Type' => 'application/yaml; charset=utf-8',
+]))->name('api.spec');
+// Relative URL, so the docs work behind the Vite proxy, nginx (Docker) and on :8000 alike.
+Route::get('/docs', fn () => view('api-docs', ['specUrl' => 'openapi.yaml']))->name('api.docs');
+
+/*
+|--------------------------------------------------------------------------
 | Public API  (prefix: /api)
 |--------------------------------------------------------------------------
 */

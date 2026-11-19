@@ -29,6 +29,7 @@ docker compose up --build
 |---|---|
 | http://localhost:8088 | The app (React served by nginx, `/api` proxied to Laravel) |
 | http://localhost:8001/api | The API directly (e.g. for Postman: set `baseUrl` to this) |
+| http://localhost:8088/api/docs | Interactive API docs (Swagger UI) |
 
 The first start takes a few minutes (it pulls images and installs dependencies). On every start, the backend container waits for MySQL and then runs the migrations and the seeder. Admin login: `admin@example.com` / `Admin@123`.
 
@@ -101,6 +102,8 @@ In development, Vite proxies `/api/*` to `http://127.0.0.1:8000`, so no CORS set
 ---
 
 ## 2. API
+
+**Interactive docs (OpenAPI 3 + Swagger UI):** open **`/api/docs`**, e.g. http://127.0.0.1:8000/api/docs, http://localhost:5173/api/docs (dev) or http://localhost:8088/api/docs (Docker). You can call every endpoint with "Try it out"; for admin endpoints, run `POST /admin/login` and then click **Authorize**. The raw spec is at `/api/openapi.yaml` (source: `backend/docs/openapi.yaml`). A test fails if a route is added without being documented, or if a documented route no longer exists. Swagger UI is loaded from the unpkg CDN, so the browser needs internet access.
 
 Base URL: `http://127.0.0.1:8000/api`. Every response uses the same envelope:
 
@@ -260,7 +263,8 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] Live slot counts: the event list auto-refreshes every 30 s and when the tab regains focus (paused while hidden)
 - [x] Pagination (API `page`/`per_page` with a stable sort order; numbered pager on the event list and the admin dashboard)
 - [x] One-click-safe cancel link in the confirmation email: `/cancel?id=…&token=…` opens a confirmation page, and only the explicit button cancels
-- [x] Automated backend tests (35 feature tests) + frontend unit tests (Vitest)
+- [x] API documentation: OpenAPI 3 spec + Swagger UI at `/api/docs`, kept in sync with the routes by a test
+- [x] Automated tests: 40 backend feature tests (PHPUnit) + 22 frontend unit tests (Vitest)
 
 ## 8. Assumptions
 

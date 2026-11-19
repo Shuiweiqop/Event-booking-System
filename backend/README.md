@@ -8,6 +8,7 @@ composer install && cp .env.example .env && php artisan key:generate
 php artisan migrate --seed
 php artisan serve
 php artisan test
+# API docs: http://127.0.0.1:8000/api/docs
 ```
 
 ## Structure
@@ -34,5 +35,8 @@ bootstrap/app.php                            routes + JSON error rendering for /
 database/migrations/                         schema (events, registrations, registration_verifications, is_admin)
 database/seeders/DatabaseSeeder.php          demo admin + sample events
 routes/api.php                               route definitions
-tests/Feature/RegistrationTest.php           35 feature tests
+docs/openapi.yaml                            OpenAPI 3 spec, served at /api/openapi.yaml, Swagger UI at /api/docs
+resources/views/api-docs.blade.php           Swagger UI page
+tests/Feature/RegistrationTest.php           34 feature tests (booking rules, verification, cancel link, pagination, admin)
+tests/Feature/ApiDocumentationTest.php       6 tests: every route documented and vice versa, $refs valid, admin ops need bearer auth
 ```

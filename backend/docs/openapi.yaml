@@ -1,0 +1,542 @@
+openapi: 3.0.3
+info:
+  title: Event Booking API
+  version: 1.0.0
+  description: |
+    Mini Event Booking System — Laravel 12 + MySQL.
+
+    **Rules enforced by the API**
+    - A person (identified by email) can hold at most **one confirmed booking per date**.
+    - An event cannot exceed `max_attendees`.
+    - A booking is created only after the email address is **verified with a 6-digit code**.
+
+    **Response envelope** — every response has the same shape:
+    `{ "success": true|false, "message": "...", "data": ..., "meta"?: ..., "errors"?: ... }`
+
+    **Booking flow**
+    1. `POST /registrations` → code is emailed (in local demo mode it is also returned as `debug_code`)
+    2. `POST /registrations/verify` → booking confirmed, returns a one-time `cancel_token`
+    3. `POST /registrations/{id}/cancel` with that token to cancel
+
+    **Admin**: `POST /admin/login`, then click **Authorize** and paste the token.
+servers:
+  - url: /api
+    description: This server
+
+tags:
+  - name: Events
+  - name: Registrations
+    description: Two-step booking with email verification, lookup and cancellation
+  - name: Admin
+    description: Requires a Bearer token from `POST /admin/login`
+
+paths:
+  /events:
+    get:
+      tags: [Events]
+      summary: List events (paginated)
+      description: Past events are hidden unless `include_past=1` or an exact `date` is given. Sorted by date, start time, id.
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date }, description: Exact date (YYYY-MM-DD) }
+        - { name: from, in: query, schema: { type: string, format: date }, description: Range start (inclusive) }
+        - { name: to, in: query, schema: { type: string, format: date }, description: 'Range end (inclusive), must be ≥ from' }
+        - { name: search, in: query, schema: { type: string, maxLength: 100 }, description: Matches title or venue }
+        - { name: include_past, in: query, schema: { type: boolean }, description: Include events before today }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 10 } }
+      responses:
+        '200':
+          description: A page of events
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Event' } }
+                      meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /events/{id}:
+    get:
+      tags: [Events]
+      summary: Get one event
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: The event
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/Event' } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /registrations:
+    post:
+      tags: [Registrations]
+      summary: 'Step 1: request a verification code'
+      description: |
+        Checks the booking rules (event not past, not full, email not already booked on that date) and
+        emails a 6-digit code. **No seat is taken yet.** The code expires after 10 minutes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_id, name, email]
+              properties:
+                event_id: { type: integer, example: 1 }
+                name: { type: string, minLength: 2, maxLength: 100, example: Jane Doe }
+                email: { type: string, format: email, maxLength: 150, example: jane@example.com }
+      responses:
+        '202':
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/PendingVerification' } }
+              example:
+                success: true
+                message: We sent a 6-digit code to j***@example.com. Enter it to confirm your booking.
+                data:
+                  verification_id: 01a1f1fa-c350-7c24-81eb-4a724027f5a7
+                  email_masked: j***@example.com
+                  expires_at: '2026-11-19T12:15:05+08:00'
+                  resend_available_at: '2026-11-19T12:06:05+08:00'
+                  debug_code: '695009'
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /registrations/verify:
+    post:
+      tags: [Registrations]
+      summary: 'Step 2: verify the code and book'
+      description: |
+        Creates the booking. All rules are re-checked inside a transaction holding a row lock on the
+        event (`SELECT … FOR UPDATE`); a `UNIQUE(email, active_event_date)` index is the final guard
+        against concurrent same-date bookings. Max 5 wrong codes per verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verification_id, code]
+              properties:
+                verification_id: { type: string, format: uuid }
+                code: { type: string, pattern: '^\d{6}$', example: '695009' }
+      responses:
+        '201':
+          description: Booked. `cancel_token` is shown once (and emailed together with a cancel link).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          registration: { $ref: '#/components/schemas/Registration' }
+                          cancel_token: { type: string, example: jcI307tOMwrJzKoDdt7alGaRBoi5bwwBJZc07Lvd }
+              example: { success: true, message: Registered successfully., data: { registration: { id: 12, status: confirmed }, cancel_token: jcI307tO… } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Code already used, event filled up, or same-date conflict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { success: false, message: You already registered for an event on this date. }
+        '410':
+          description: Code expired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { success: false, message: This code has expired. Please request a new one. }
+        '422':
+          description: Wrong code (with attempts left) or invalid input
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { success: false, message: Incorrect code. 4 attempt(s) left. }
+        '429':
+          description: Too many wrong codes — request a new one
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+
+  /registrations/verifications/{id}/resend:
+    post:
+      tags: [Registrations]
+      summary: Resend the verification code
+      description: Issues a new code (old one stops working), resets attempts and expiry. 60-second cooldown.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid }, description: verification_id }
+      responses:
+        '200':
+          description: New code sent
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/PendingVerification' } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429':
+          description: Cooldown not over yet
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { success: false, message: Please wait 42 seconds before requesting a new code. }
+
+  /registrations/{id}:
+    get:
+      tags: [Registrations]
+      summary: Get a booking (cancel-link page)
+      description: |
+        Used by the `/cancel` page linked from the confirmation email. **Never cancels anything** —
+        email clients and link scanners open links automatically. The token is sent in a header so it
+        is not written to access logs. "Not found" and "wrong token" return the same 404.
+      security: [{ cancelToken: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: The booking
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/Registration' } }
+        '401':
+          description: X-Cancel-Token header missing
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /registrations/{id}/cancel:
+    post:
+      tags: [Registrations]
+      summary: Cancel a booking
+      description: Frees the seat and the person's date (they can book another event on that day).
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [cancel_token]
+              properties:
+                cancel_token: { type: string, maxLength: 100 }
+      responses:
+        '200':
+          description: Cancelled
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/Registration' } }
+              example: { success: true, message: Your booking has been cancelled., data: { id: 12, status: cancelled } }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Already cancelled
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '422':
+          description: Event already took place, or invalid input
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  /admin/login:
+    post:
+      tags: [Admin]
+      summary: Log in as admin
+      description: Returns a Sanctum bearer token valid for 8 hours. Rate-limited to 5 attempts/minute per email + IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: admin@example.com }
+                password: { type: string, example: Admin@123 }
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          token: { type: string, example: 1|abcdef… }
+                          token_type: { type: string, example: Bearer }
+                          expires_in: { type: integer, example: 28800 }
+                          user: { $ref: '#/components/schemas/AdminUser' }
+        '401':
+          description: Invalid email or password
+          content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /admin/me:
+    get:
+      tags: [Admin]
+      summary: Current admin
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200':
+          description: The logged-in admin
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/AdminUser' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /admin/logout:
+    post:
+      tags: [Admin]
+      summary: Log out (revoke the current token)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /admin/events:
+    post:
+      tags: [Admin]
+      summary: Create an event
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, event_date, max_attendees]
+              properties:
+                title: { type: string, maxLength: 150, example: Laravel Meetup }
+                description: { type: string, maxLength: 5000, nullable: true }
+                venue: { type: string, maxLength: 150, nullable: true, example: Hall A }
+                event_date: { type: string, format: date, description: Today or later, example: '2026-12-31' }
+                start_time: { type: string, pattern: '^\d{2}:\d{2}$', nullable: true, example: '10:00' }
+                max_attendees: { type: integer, minimum: 1, maximum: 100000, example: 30 }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/Event' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /admin/events/{id}:
+    delete:
+      tags: [Admin]
+      summary: Delete an event
+      description: Its registrations are removed too (`ON DELETE CASCADE`).
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200': { $ref: '#/components/responses/Ok' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /admin/events/{id}/registrations:
+    get:
+      tags: [Admin]
+      summary: List an event's registrations (attendees)
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      responses:
+        '200':
+          description: All registrations, newest first (confirmed and cancelled)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties:
+                      data: { type: array, items: { $ref: '#/components/schemas/Registration' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Token from `POST /admin/login`
+    cancelToken:
+      type: apiKey
+      in: header
+      name: X-Cancel-Token
+      description: The `cancel_token` returned when the booking was confirmed (also in the confirmation email)
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+
+  schemas:
+    Envelope:
+      type: object
+      required: [success, message]
+      properties:
+        success: { type: boolean }
+        message: { type: string }
+
+    Error:
+      type: object
+      required: [success, message]
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string }
+
+    ValidationErrorBody:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            errors:
+              type: object
+              additionalProperties: { type: array, items: { type: string } }
+              example: { email: ['The email field must be a valid email address.'] }
+
+    Event:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        title: { type: string, example: React Hooks Deep Dive }
+        description: { type: string, nullable: true }
+        venue: { type: string, nullable: true, example: 'Hall A, KL Tech Hub' }
+        event_date: { type: string, format: date, example: '2026-11-22' }
+        start_time: { type: string, nullable: true, example: '09:30' }
+        max_attendees: { type: integer, example: 30 }
+        registered_count: { type: integer, description: Confirmed bookings, example: 12 }
+        available_slots: { type: integer, description: max_attendees − registered_count, example: 18 }
+        is_full: { type: boolean }
+        is_past: { type: boolean }
+
+    PaginationMeta:
+      type: object
+      properties:
+        current_page: { type: integer, example: 1 }
+        last_page: { type: integer, example: 2 }
+        per_page: { type: integer, example: 10 }
+        total: { type: integer, example: 12 }
+        from: { type: integer, nullable: true, example: 1 }
+        to: { type: integer, nullable: true, example: 10 }
+
+    Registration:
+      type: object
+      properties:
+        id: { type: integer, example: 12 }
+        event_id: { type: integer, example: 1 }
+        name: { type: string, example: Jane Doe }
+        email: { type: string, format: email, example: jane@example.com }
+        event_date: { type: string, format: date }
+        status: { type: string, enum: [confirmed, cancelled] }
+        created_at: { type: string, format: date-time }
+        cancelled_at: { type: string, format: date-time, nullable: true }
+        event:
+          type: object
+          properties:
+            id: { type: integer }
+            title: { type: string }
+            event_date: { type: string, format: date }
+            venue: { type: string, nullable: true }
+
+    PendingVerification:
+      type: object
+      properties:
+        verification_id: { type: string, format: uuid }
+        email_masked: { type: string, example: j***@example.com }
+        expires_at: { type: string, format: date-time }
+        resend_available_at: { type: string, format: date-time }
+        debug_code:
+          type: string
+          description: Only when BOOKING_EXPOSE_CODE=true (local demo). Never in production.
+          example: '695009'
+
+    AdminUser:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+
+  responses:
+    Ok:
+      description: Done
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Envelope' }
+    ValidationError:
+      description: Invalid input
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ValidationErrorBody' }
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { success: false, message: Resource not found. }
+    Conflict:
+      description: Business-rule conflict (already booked, same date, full)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { success: false, message: You already registered for an event on this date. }
+    Unauthenticated:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { success: false, message: Unauthenticated. Please log in. }
+    Forbidden:
+      description: Not an admin
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { success: false, message: Admin access required. }
+    TooManyRequests:
+      description: Rate limited
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { success: false, message: Too many requests. Please slow down and try again shortly. }
