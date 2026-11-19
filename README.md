@@ -28,6 +28,95 @@ event-booking/
 
 ---
 
+## Architecture & data flow
+
+### System overview
+
+```mermaid
+flowchart LR
+    subgraph Client["Browser"]
+        SPA["React SPA<br/>pages · components · hooks<br/>axios client"]
+        LS[("localStorage<br/>my bookings, admin token")]
+        SPA <--> LS
+    end
+
+    subgraph Edge["Proxy (Vite dev / nginx)"]
+        PX["/ → static SPA<br/>/api/* → Laravel"]
+    end
+
+    subgraph API["Laravel 12 API"]
+        direction TB
+        RT["routes/api.php"] --> MW["Middleware<br/>throttle · auth:sanctum · admin"]
+        MW --> CT["Controllers<br/>Event · Registration · Auth"]
+        CT --> RQ["Form Requests<br/>validation"]
+        CT --> SV["Services<br/>RegistrationService<br/>EmailVerificationService<br/>EventService"]
+        SV --> MD["Eloquent models"]
+        CT --> RS["API Resources<br/>{ success, message, data, meta }"]
+        SV --> ML["Mail<br/>code · confirmation + cancel link"]
+        SC["Scheduler<br/>daily model:prune"]
+    end
+
+    DB[("MySQL<br/>events · registrations<br/>registration_verifications<br/>users · tokens")]
+    MAIL["SMTP / log driver"]
+
+    SPA -- "JSON over HTTP" --> PX --> RT
+    MD -- "transactions<br/>SELECT … FOR UPDATE" --> DB
+    ML --> MAIL
+    SC --> DB
+```
+
+- **The frontend never enforces rules on its own.** It checks input early for quick feedback, but every rule (capacity, one booking per date, verification) is decided in a **service class** on the backend.
+- **Controllers stay thin.** Validation is in Form Requests, business rules are in Services, and the output shape is in API Resources. Every response has the same `{ success, message, data }` envelope.
+
+### Booking flow (the core rule)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant FE as React SPA
+    participant API as Laravel API
+    participant DB as MySQL
+    participant M as Mail
+
+    U->>FE: Click "Register", enter name + email
+    FE->>FE: Validate fields, warn if this browser already booked that date
+    FE->>API: POST /registrations {event_id, name, email}
+    API->>DB: Pre-check (no lock): not past, not full, email free on that date
+    alt Rule broken
+        API-->>FE: 409 / 422 {success:false, message}
+    else OK
+        API->>DB: INSERT registration_verifications (HMAC of code, expires in 10 min)
+        API->>M: 6-digit code
+        API-->>FE: 202 {verification_id}
+    end
+
+    U->>FE: Enter code from email
+    FE->>API: POST /registrations/verify {verification_id, code}
+    API->>DB: Lock verification row, check code (max 5 attempts)
+    Note over API,DB: BEGIN TRANSACTION
+    API->>DB: SELECT event … FOR UPDATE (serialises bookings for this event)
+    API->>DB: Re-check: not past · email free on date · confirmed < max_attendees
+    API->>DB: INSERT registration (active_event_date = event date)
+    Note over DB: UNIQUE(email, active_event_date) rejects a parallel<br/>booking for another event on the same date
+    Note over API,DB: COMMIT
+    API->>M: Confirmation with booking ID + cancel link
+    API-->>FE: 201 {registration, cancel_token}
+    FE->>FE: Save to "My Bookings" (localStorage), refresh slot counts
+
+    U->>FE: Open cancel link from email
+    FE->>API: GET /registrations/{id} (X-Cancel-Token), only shows the booking
+    U->>FE: Click "Yes, cancel my booking"
+    FE->>API: POST /registrations/{id}/cancel {cancel_token}
+    API->>DB: Lock event, status = cancelled, active_event_date = NULL
+    Note over DB: Seat and date are freed: slots are counted<br/>from confirmed rows, and NULLs never collide in the unique index
+    API-->>FE: 200 {success:true}
+```
+
+The same flow drives every other screen. The event list polls `GET /events` every 30 s (and when the tab regains focus), so slot counts stay current. Admin actions go through Sanctum-protected routes: `PUT /admin/events/{id}` uses the same event row lock, so editing an event and booking it can never interleave.
+
+---
+
 ## 1. Setup
 
 ### Option A: Docker (one command, recommended for a quick look)
