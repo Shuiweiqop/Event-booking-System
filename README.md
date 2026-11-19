@@ -4,15 +4,26 @@
 
 React (Vite) frontend + Laravel 12 (PHP 8.2) REST API + MySQL.
 
-Users can browse events, register with name + email (confirmed by a 6-digit code sent to that email), and cancel. A person **cannot hold more than one booking on the same date**, and an event **cannot exceed `max_attendees`**. Both rules are enforced in the backend, inside a database transaction, with a database constraint as the final safeguard. Admins log in with a token to create and delete events.
+Users can browse events, register with name + email (confirmed by a 6-digit code sent to that email), and cancel. A person **cannot hold more than one booking on the same date**, and an event **cannot exceed `max_attendees`**. Both rules are enforced in the backend, inside a database transaction, with a database constraint as the final safeguard. Admins log in with a token to create, edit and delete events.
+
+| Event list (live slot counts, filters, pagination) | Booking: email verification step |
+|---|---|
+| ![Event list](docs/screenshots/events.png) | ![Verification code](docs/screenshots/verify-code.png) |
+| **Admin: create / edit / delete, attendee list** | **Interactive API docs at `/api/docs`** |
+| ![Admin dashboard](docs/screenshots/admin.png) | ![Swagger UI](docs/screenshots/api-docs.png) |
+
+<p align="center"><img src="docs/screenshots/mobile.png" alt="Mobile layout" width="260"><br><sub>Mobile layout</sub></p>
 
 ```
 event-booking/
-├── backend/     Laravel API (see backend/README.md)
-├── frontend/    React + Vite SPA (see frontend/README.md)
-├── database/    schema.sql – plain-SQL schema + sample data
-├── postman/     EventBooking.postman_collection.json
-└── README.md    ← you are here
+├── backend/            Laravel API (see backend/README.md)
+├── frontend/           React + Vite SPA (see frontend/README.md)
+├── database/           schema.sql – plain-SQL schema + sample data
+├── postman/            EventBooking.postman_collection.json
+├── docs/screenshots/   images used in this README
+├── .github/workflows/  CI: tests, MySQL concurrency test, frontend, Docker build
+├── docker-compose.yml  one-command demo
+└── README.md           ← you are here
 ```
 
 ---
