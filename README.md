@@ -288,3 +288,32 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - Past events are listed only on request, cannot be booked, and their bookings cannot be cancelled.
 - **Editing an event** (`PUT /admin/events/{id}`) keeps existing bookings consistent. Past events cannot be edited. Capacity cannot drop below the number of confirmed bookings. Changing the date moves every booking to the new date (both `event_date` and `active_event_date`), so the "one per date" rule still holds. If any attendee already has another confirmed booking on the new date, the whole change is refused with a 409 that says how many attendees conflict, rather than leaving some bookings moved and others not. Attendees are not notified about the change yet; a "your event moved" email would be the natural next step.
 - "My Bookings" in the UI is stored per browser (localStorage). From another device, a booking can still be cancelled with its booking ID + cancellation code.
+
+---
+
+## 9. Future improvements
+
+These were left out on purpose, to keep the scope at what the brief asks for. The open questions are what I would confirm with the client before building.
+
+### Attendance / check-in
+Mark who actually attended, e.g. a "Check in" action in the admin attendee list, or a QR code in the confirmation email that staff scan at the door. Questions for the client first:
+- Is check-in allowed only on the event day, or also earlier or later (late corrections)?
+- Who checks people in: staff in the admin panel, or attendees themselves by scanning a code?
+- Can a cancelled booking be checked in (walk-ins)? Can a checked-in booking still be cancelled?
+- Can a check-in be undone, and should we log who did it and when?
+
+A likely design: a nullable `checked_in_at` (+ `checked_in_by`) column on `registrations`, an admin endpoint guarded by the same row lock, and an attendance count per event.
+
+### Trade-offs taken in this version
+| Current | Why | Next step |
+|---|---|---|
+| The admin token is stored in `localStorage` | Simple, and it keeps the API usable by any client (Postman, mobile) | Sanctum SPA auth with an httpOnly cookie, so an XSS bug could not read the token |
+| Emails are sent synchronously inside the request | No queue worker is needed to run the demo | Use `ShouldQueue` mailables and a queue worker, so a slow SMTP server never delays a booking |
+| Changing an event's date or deleting an event does not notify attendees | Out of scope for the brief | Send a "your event changed / was cancelled" email to every confirmed attendee |
+| Demo mode returns the verification code in the response (`BOOKING_EXPOSE_CODE`) | Lets reviewers test without a mailbox | Already off by default; production would use real SMTP |
+
+### Other ideas
+- **Waitlist**: when an event is full, join a queue and get the freed seat automatically on cancellation (inside the same row lock).
+- **Online hosting**: a public demo (e.g. Railway with MySQL). It would need a scheduled data reset and a non-public admin password, because the demo credentials are in this README.
+- **User accounts (optional)**: "My Bookings" across devices without cancel codes, while keeping guest booking.
+- **Reminder emails** the day before the event (scheduler + queue).
