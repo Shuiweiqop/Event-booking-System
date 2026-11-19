@@ -82,6 +82,23 @@ class RegistrationController extends Controller
         return $payload;
     }
 
+    /**
+     * GET /api/registrations/{id}   header  X-Cancel-Token: <token>
+     * Lets the cancel-link page show what is about to be cancelled. The token travels in a
+     * header (not the query string) so it doesn't end up in server access logs.
+     */
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $token = (string) $request->header('X-Cancel-Token', '');
+        if ($token === '') {
+            return response()->json(['success' => false, 'message' => 'The X-Cancel-Token header is required.'], 401);
+        }
+
+        $registration = $this->service->findWithToken($id, $token);
+
+        return $this->ok('Booking retrieved.', new RegistrationResource($registration));
+    }
+
     /** POST /api/registrations/{id}/cancel  { cancel_token } */
     public function cancel(Request $request, int $id): JsonResponse
     {

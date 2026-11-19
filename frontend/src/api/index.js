@@ -17,6 +17,9 @@ export const registrationsApi = {
     unwrap(client.post('/registrations/verify', { verification_id: verificationId, code })),
   resendCode: (verificationId) =>
     unwrap(client.post(`/registrations/verifications/${verificationId}/resend`)),
+  // Token in a header so it never appears in server access logs.
+  get: (id, cancelToken) =>
+    unwrap(client.get(`/registrations/${id}`, { headers: { 'X-Cancel-Token': cancelToken } })),
   cancel: (id, cancelToken) =>
     unwrap(client.post(`/registrations/${id}/cancel`, { cancel_token: cancelToken })),
 }

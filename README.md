@@ -117,6 +117,7 @@ Base URL: `http://127.0.0.1:8000/api`. Every response uses the same envelope:
 | POST | `/registrations` | – | **Step 1.** `{ event_id, name, email }`. Checks the booking rules and emails a 6-digit code. Returns **202** with `verification_id`. No seat is taken yet |
 | POST | `/registrations/verify` | code | **Step 2.** `{ verification_id, code }`. Creates the booking. Returns **201** with the registration and a one-time `cancel_token` (also emailed) |
 | POST | `/registrations/verifications/{id}/resend` | – | New code (60 s cooldown, resets attempts) |
+| GET | `/registrations/{id}` | cancel token | Booking details for the cancel-link page. The token goes in the `X-Cancel-Token` header so it is not written to access logs. Never cancels anything |
 | POST | `/registrations/{id}/cancel` | cancel token | `{ cancel_token }` |
 | POST | `/admin/login` | – | `{ email, password }`, returns a Bearer token (expires in 8 h) |
 | GET | `/admin/me` | Bearer | Current admin |
@@ -167,6 +168,7 @@ Design decisions:
   - The booking rules are pre-checked **before** a code is sent, so users learn about "full" or "same date" right away. The real check runs again under the row lock when the code is verified.
   - The wrong-attempt counter is committed *before* the error is returned. If the error were thrown inside the transaction, the increment would be rolled back and guesses would be unlimited.
 - **Cancellation without login.** On registration the API returns a random 40-character `cancel_token`, shown to the user once. Only its SHA-256 hash is stored. Cancelling requires booking ID + token. A missing booking and a wrong token return the same 404, so booking IDs cannot be enumerated.
+- **The cancel link in the email only *shows* the booking.** Email clients and security scanners often open links automatically, so a link that cancelled on `GET` could cancel bookings nobody meant to cancel. The page loads the booking with `GET /registrations/{id}`, and only the explicit "Yes, cancel my booking" button sends the `POST`. After the page reads the token, it removes it from the address bar (keeping it in `sessionStorage` for that tab), so it does not stay in browser history. The plain-text email templates use unescaped Blade output: with `{{ }}`, the `&` in the link arrived as `&amp;` and broke it, which a test now guards against.
 
 ---
 
@@ -257,7 +259,8 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] Deployable demo: `docker compose up --build` (MySQL 8 + Laravel + nginx)
 - [x] Live slot counts: the event list auto-refreshes every 30 s and when the tab regains focus (paused while hidden)
 - [x] Pagination (API `page`/`per_page` with a stable sort order; numbered pager on the event list and the admin dashboard)
-- [x] Automated backend tests (29 feature tests) + frontend unit tests (Vitest)
+- [x] One-click-safe cancel link in the confirmation email: `/cancel?id=…&token=…` opens a confirmation page, and only the explicit button cancels
+- [x] Automated backend tests (35 feature tests) + frontend unit tests (Vitest)
 
 ## 8. Assumptions
 

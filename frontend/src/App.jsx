@@ -4,6 +4,7 @@ import Navbar from './components/Navbar'
 import { useAuth } from './context/AuthContext'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import AdminLoginPage from './pages/AdminLoginPage'
+import CancelBookingPage from './pages/CancelBookingPage'
 import EventsPage from './pages/EventsPage'
 import MyBookingsPage from './pages/MyBookingsPage'
 
@@ -17,6 +18,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<EventsPage />} />
           <Route path="/my-bookings" element={<MyBookingsPage />} />
+          <Route path="/cancel" element={<CancelBookingPage />} />
           <Route path="/admin" element={isAdmin ? <AdminDashboardPage /> : <AdminLoginPage />} />
           <Route path="*" element={
             <div className="container">

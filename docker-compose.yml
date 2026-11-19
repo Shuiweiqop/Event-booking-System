@@ -34,6 +34,7 @@ services:
       DB_PASSWORD: booking_secret
       MAIL_MAILER: log
       BOOKING_EXPOSE_CODE: "true"   # demo only: shows the email code in the UI
+      FRONTEND_URL: http://localhost:8088   # used for the cancel link in confirmation emails
       LOG_CHANNEL: stderr           # logs (incl. "sent" emails) visible via: docker compose logs backend
     depends_on:
       db:

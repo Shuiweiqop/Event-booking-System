@@ -1,9 +1,10 @@
-Hi {{ $name }},
+{{-- Plain-text email: unescaped output on purpose (see booking-confirmed.blade.php). --}}
+Hi {!! $name !!},
 
-Your verification code for "{{ $eventTitle }}" ({{ $eventDate }}) is:
+Your verification code for "{!! $eventTitle !!}" ({!! $eventDate !!}) is:
 
-    {{ $code }}
+    {!! $code !!}
 
-The code expires in {{ $minutes }} minutes. If you did not try to book this event, you can ignore this email — no booking has been made.
+The code expires in {!! $minutes !!} minutes. If you did not try to book this event, you can ignore this email — no booking has been made.
 
-— {{ config('app.name') }}
+— {!! config('app.name') !!}

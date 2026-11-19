@@ -92,15 +92,25 @@ class RegistrationService
         }
     }
 
+    /**
+     * Look up a booking by ID + its cancel token (used by the cancel link page).
+     * Same 404 for "not found" and "wrong token", so booking IDs can't be probed.
+     */
+    public function findWithToken(int $registrationId, string $plainToken): Registration
+    {
+        $registration = Registration::query()->with('event')->find($registrationId);
+
+        if (! $registration || ! hash_equals($registration->cancel_token_hash, Registration::hashToken($plainToken))) {
+            throw new BookingException('Booking not found or cancellation code is invalid.', 404);
+        }
+
+        return $registration;
+    }
+
     public function cancel(int $registrationId, string $plainToken): Registration
     {
         return DB::transaction(function () use ($registrationId, $plainToken) {
-            $registration = Registration::query()->whereKey($registrationId)->first();
-
-            // Same response for "not found" and "wrong token" so IDs can't be probed.
-            if (! $registration || ! hash_equals($registration->cancel_token_hash, Registration::hashToken($plainToken))) {
-                throw new BookingException('Booking not found or cancellation code is invalid.', 404);
-            }
+            $registration = $this->findWithToken($registrationId, $plainToken);
 
             // Lock the event row: keeps capacity bookkeeping serialised with registrations.
             $event = Event::query()->whereKey($registration->event_id)->lockForUpdate()->first();

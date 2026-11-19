@@ -31,6 +31,16 @@ class BookingConfirmedMail extends Mailable
             'venue' => $this->registration->event->venue,
             'bookingId' => $this->registration->id,
             'cancelToken' => $this->cancelToken,
+            'cancelUrl' => $this->cancelUrl(),
+        ]);
+    }
+
+    /** Opens a confirmation page — visiting the link alone never cancels anything. */
+    public function cancelUrl(): string
+    {
+        return config('app.frontend_url').'/cancel?'.http_build_query([
+            'id' => $this->registration->id,
+            'token' => $this->cancelToken,
         ]);
     }
 }

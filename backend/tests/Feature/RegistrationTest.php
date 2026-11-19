@@ -210,6 +210,79 @@ class RegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------
+     | Cancel link (confirmation email) + lookup
+     * ------------------------------------------------------------------ */
+
+    public function test_confirmation_email_contains_a_cancel_link(): void
+    {
+        config(['app.frontend_url' => 'https://events.example.com']);
+        $res = $this->register($this->makeEvent())->assertCreated();
+        $id = $res->json('data.registration.id');
+        $token = $res->json('data.cancel_token');
+
+        Mail::assertSent(BookingConfirmedMail::class, function (BookingConfirmedMail $mail) use ($id, $token) {
+            $expected = "https://events.example.com/cancel?id={$id}&token={$token}";
+            $this->assertSame($expected, $mail->cancelUrl());
+            $mail->assertSeeInText($expected);
+
+            return true;
+        });
+    }
+
+    public function test_plain_text_emails_are_not_html_escaped(): void
+    {
+        $this->register($this->makeEvent(['title' => 'R&D "Open" Day']), 'tom@example.com', 'Tom & Jerry')->assertCreated();
+
+        Mail::assertSent(VerificationCodeMail::class, function ($mail) {
+            $mail->assertSeeInText('Hi Tom & Jerry,');
+            $mail->assertSeeInText('"R&D "Open" Day"');
+
+            return true;
+        });
+        Mail::assertSent(BookingConfirmedMail::class, function ($mail) {
+            $mail->assertSeeInText('Hi Tom & Jerry,');
+            $mail->assertDontSeeInText('&amp;');
+
+            return true;
+        });
+    }
+
+    public function test_booking_can_be_looked_up_with_its_token(): void
+    {
+        $res = $this->register($this->makeEvent(['title' => 'Lookup Event']))->assertCreated();
+        $id = $res->json('data.registration.id');
+
+        $this->getJson("/api/registrations/{$id}", ['X-Cancel-Token' => $res->json('data.cancel_token')])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'confirmed')
+            ->assertJsonPath('data.event.title', 'Lookup Event')
+            ->assertJsonMissingPath('data.cancel_token_hash');
+    }
+
+    public function test_lookup_rejects_missing_or_wrong_token_without_revealing_existence(): void
+    {
+        $id = $this->register($this->makeEvent())->json('data.registration.id');
+
+        $this->getJson("/api/registrations/{$id}")->assertUnauthorized();
+        $wrong = $this->getJson("/api/registrations/{$id}", ['X-Cancel-Token' => 'wrong'])->assertNotFound();
+        $missing = $this->getJson('/api/registrations/99999', ['X-Cancel-Token' => 'wrong'])->assertNotFound();
+        $this->assertSame($wrong->json('message'), $missing->json('message'));
+    }
+
+    public function test_opening_the_lookup_never_cancels(): void
+    {
+        $res = $this->register($this->makeEvent())->assertCreated();
+        $id = $res->json('data.registration.id');
+        $headers = ['X-Cancel-Token' => $res->json('data.cancel_token')];
+
+        $this->getJson("/api/registrations/{$id}", $headers)->assertOk();
+        $this->getJson("/api/registrations/{$id}", $headers)->assertJsonPath('data.status', 'confirmed');
+
+        $this->postJson("/api/registrations/{$id}/cancel", ['cancel_token' => $res->json('data.cancel_token')])->assertOk();
+        $this->getJson("/api/registrations/{$id}", $headers)->assertJsonPath('data.status', 'cancelled');
+    }
+
+    /* ------------------------------------------------------------------
      | Pagination
      * ------------------------------------------------------------------ */
 

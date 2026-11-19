@@ -17,6 +17,7 @@ Route::middleware('throttle:bookings')->group(function () {
     Route::post('/registrations', [RegistrationController::class, 'store']);            // step 1: email a code
     Route::post('/registrations/verify', [RegistrationController::class, 'verify']);    // step 2: confirm
     Route::post('/registrations/verifications/{id}/resend', [RegistrationController::class, 'resend'])->whereUuid('id');
+    Route::get('/registrations/{id}', [RegistrationController::class, 'show'])->whereNumber('id');   // needs X-Cancel-Token
     Route::post('/registrations/{id}/cancel', [RegistrationController::class, 'cancel'])->whereNumber('id');
 });
 
