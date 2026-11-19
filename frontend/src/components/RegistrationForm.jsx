@@ -1,0 +1,115 @@
+import { useState } from 'react'
+import { registrationsApi } from '../api'
+import useMyBookings from '../hooks/useMyBookings'
+import { formatDate, formatTime } from '../utils/format'
+import { firstErrors, validateRegistration } from '../utils/validation'
+import Alert from './Alert'
+import InputField from './InputField'
+import Spinner from './Spinner'
+
+/**
+ * Registration form for one event.
+ * Flow: client validation -> local same-date hint -> POST -> success / server error.
+ * The server is the source of truth for every rule; client checks just save a round-trip.
+ */
+export default function RegistrationForm({ event, onSuccess, onClose }) {
+  const [form, setForm] = useState({ name: '', email: '' })
+  const [errors, setErrors] = useState({})
+  const [serverError, setServerError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [result, setResult] = useState(null)
+  const { addBooking, findConflict } = useMyBookings()
+
+  const update = (field) => (e) => {
+    setForm((f) => ({ ...f, [field]: e.target.value }))
+    setErrors((er) => ({ ...er, [field]: undefined }))
+    setServerError(null)
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const clientErrors = validateRegistration(form)
+    if (Object.keys(clientErrors).length) {
+      setErrors(clientErrors)
+      return
+    }
+
+    const conflict = findConflict(form.email, event.event_date)
+    if (conflict) {
+      setServerError(
+        conflict.event_id === event.id
+          ? 'You are already registered for this event.'
+          : `You already registered for an event on this date ("${conflict.event?.title ?? 'another event'}").`,
+      )
+      return
+    }
+
+    setSubmitting(true)
+    setServerError(null)
+    try {
+      const body = await registrationsApi.create({ eventId: event.id, name: form.name.trim(), email: form.email.trim() })
+      addBooking(body.data.registration, body.data.cancel_token)
+      setResult(body)
+      onSuccess?.()
+    } catch (err) {
+      setErrors(firstErrors(err.errors))
+      setServerError(err.message)
+      // Event may have filled up / been deleted meanwhile — refresh the listing.
+      if (err.status === 409 || err.status === 404) onSuccess?.()
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (result) {
+    const reg = result.data.registration
+    return (
+      <div className="confirmation">
+        <Alert type="success" title={result.message}>
+          You&apos;re booked for <strong>{event.title}</strong> on {formatDate(event.event_date)}.
+        </Alert>
+        <dl className="confirmation__details">
+          <dt>Booking ID</dt><dd>#{reg.id}</dd>
+          <dt>Name</dt><dd>{reg.name}</dd>
+          <dt>Email</dt><dd>{reg.email}</dd>
+          <dt>Cancellation code</dt><dd><code className="code">{result.data.cancel_token}</code></dd>
+        </dl>
+        <p className="muted small">
+          This booking is saved under <strong>My Bookings</strong> in this browser. Keep the cancellation code if you
+          may need to cancel from another device.
+        </p>
+        <div className="form-actions">
+          <button type="button" className="btn btn--primary" onClick={onClose}>Done</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <form onSubmit={handleSubmit} noValidate>
+      <div className="event-summary">
+        <strong>{event.title}</strong>
+        <span>
+          {formatDate(event.event_date)}
+          {event.start_time && ` · ${formatTime(event.start_time)}`} · {event.available_slots} slot
+          {event.available_slots === 1 ? '' : 's'} left
+        </span>
+      </div>
+
+      {serverError && <Alert type="error" title="Registration failed">{serverError}</Alert>}
+
+      <InputField label="Full name" name="name" autoComplete="name" required maxLength={100}
+        value={form.name} onChange={update('name')} error={errors.name} disabled={submitting} />
+      <InputField label="Email" name="email" type="email" autoComplete="email" required maxLength={150}
+        value={form.email} onChange={update('email')} error={errors.email} disabled={submitting}
+        hint="One booking per email per day." />
+
+      <div className="form-actions">
+        <button type="button" className="btn btn--ghost" onClick={onClose} disabled={submitting}>Cancel</button>
+        <button type="submit" className="btn btn--primary" disabled={submitting}>
+          {submitting ? <><Spinner inline /> Registering…</> : 'Confirm registration'}
+        </button>
+      </div>
+    </form>
+  )
+}
