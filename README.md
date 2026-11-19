@@ -164,6 +164,27 @@ There is a test for this: `test_database_unique_index_blocks_same_date_even_if_a
 
 In short: the **row lock** guarantees capacity, and the **unique index** guarantees the per-date rule. The application-level checks remain so that users get specific, friendly error messages.
 
+### Proving it: a real concurrency test against MySQL
+
+`php artisan serve` handles one request at a time, so firing HTTP requests at it would not prove anything. Instead, this artisan command starts **N separate PHP processes**. Each process boots Laravel, waits for a shared start timestamp, and then runs `RegistrationService::register()` at the same instant, which means N genuinely parallel MySQL transactions:
+
+```bash
+cd backend
+php artisan booking:race-test                                # 30 people race for 3 seats
+php artisan booking:race-test --mode=same-date --requests=15 # 1 person books 15 events on one date
+php artisan booking:race-test --requests=50 --seats=5        # tune the numbers
+```
+
+The command checks the **database rows**, not only the responses, and deletes its test events afterwards:
+
+| Scenario | Successes | Rejected | Confirmed rows | Result |
+|---|---|---|---|---|
+| 30 people, 3 seats | 3 | 27 *"fully booked"* | 3 | PASS |
+| 1 person, 15 events, same date | 1 | 14 *"already registered … this date"* | 1 | PASS |
+| 30 people, 3 seats, **with `lockForUpdate()` temporarily removed** | 8 | 22 | **8** | **FAIL (overbooked)** |
+
+The last row shows that the test catches a real bug: without the row lock, 8 people got 3 seats.
+
 ---
 
 ## 6. Security / API authentication
