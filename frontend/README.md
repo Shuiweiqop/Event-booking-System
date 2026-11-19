@@ -32,6 +32,7 @@ src/
 │   ├── VerifyCodeStep.jsx   6-digit code input, attempts/expiry errors, resend countdown
 │   ├── InputField.jsx       label + input + inline error (accessible)
 │   ├── LiveIndicator.jsx    "Live · slots updated 12s ago"
+│   ├── Pagination.jsx       prev / numbered pages with ellipsis / next (+ Pagination.test.jsx)
 │   ├── Modal.jsx, Alert.jsx, Spinner.jsx, EmptyState.jsx, Navbar.jsx
 ├── context/AuthContext.jsx  admin token state, login / logout
 ├── hooks/
@@ -42,7 +43,7 @@ src/
 │   └── useCountdown.js      seconds-left timer (resend cooldown)
 ├── pages/                   EventsPage, MyBookingsPage, AdminLoginPage, AdminDashboardPage
 ├── test/setup.js            jest-dom matchers + cleanup between tests
-├── utils/                   format.js (dates), validation.js
+├── utils/                   format.js (dates), validation.js, pagination.js (page list)
 ├── App.jsx                  routes
 └── main.jsx
 ```

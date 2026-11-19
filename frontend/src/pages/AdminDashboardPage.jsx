@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { adminApi } from '../api'
 import Alert from '../components/Alert'
 import EmptyState from '../components/EmptyState'
 import InputField from '../components/InputField'
+import Pagination from '../components/Pagination'
 import Spinner from '../components/Spinner'
 import useEvents from '../hooks/useEvents'
 import { formatDate, formatTime, todayYmd } from '../utils/format'
@@ -11,8 +12,14 @@ import { firstErrors, validateEvent } from '../utils/validation'
 const EMPTY = { title: '', description: '', venue: '', event_date: '', start_time: '', max_attendees: '' }
 
 export default function AdminDashboardPage() {
-  const { events, loading, error, refetch } = useEvents({ include_past: 1 })
+  const [page, setPage] = useState(1)
+  const { events, meta, loading, error, refetch } = useEvents({ include_past: 1, page, per_page: 10 })
   const [flash, setFlash] = useState(null)
+
+  // Deleting the last event on the last page would leave an empty page — step back.
+  useEffect(() => {
+    if (meta && page > meta.last_page) setPage(meta.last_page)
+  }, [meta, page])
 
   return (
     <section className="container">
@@ -44,6 +51,7 @@ export default function AdminDashboardPage() {
               ))}
             </ul>
           )}
+          <Pagination meta={meta} onChange={setPage} disabled={loading} label="events" />
         </div>
       </div>
     </section>

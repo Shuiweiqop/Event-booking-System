@@ -30,6 +30,18 @@ class DatabaseSeeder extends Seeder
                 'description' => 'From localhost to production: Docker, CI/CD and monitoring.'],
             ['title' => 'Startup Networking Night', 'venue' => 'Bangsar South', 'event_date' => $d(14), 'start_time' => '19:00', 'max_attendees' => 1,
                 'description' => 'Single seat — fills up after one booking.'],
+            ['title' => 'TypeScript for React Developers', 'venue' => 'Hall A, KL Tech Hub', 'event_date' => $d(16), 'start_time' => '09:30', 'max_attendees' => 35,
+                'description' => 'Typing props, hooks and API responses without the pain.'],
+            ['title' => 'Securing REST APIs', 'venue' => 'Room 3, Cyberjaya', 'event_date' => $d(18), 'start_time' => '14:00', 'max_attendees' => 20,
+                'description' => 'Authentication, rate limiting and the OWASP API Top 10 in practice.'],
+            ['title' => 'Docker for PHP Developers', 'venue' => 'Online (Zoom)', 'event_date' => $d(21), 'start_time' => '20:00', 'max_attendees' => 80,
+                'description' => 'Containerise a Laravel app with MySQL and nginx.'],
+            ['title' => 'Testing React with Vitest', 'venue' => 'Hall B, KL Tech Hub', 'event_date' => $d(24), 'start_time' => '10:00', 'max_attendees' => 30,
+                'description' => 'Unit and component tests with Testing Library and fake timers.'],
+            ['title' => 'Database Design Clinic', 'venue' => 'Penang Digital Centre', 'event_date' => $d(28), 'start_time' => '15:00', 'max_attendees' => 15,
+                'description' => 'Bring your schema — indexes, constraints and normalisation reviewed live.'],
+            ['title' => 'Year-End Tech Meetup', 'venue' => 'Bangsar South', 'event_date' => $d(35), 'start_time' => '18:30', 'max_attendees' => 60,
+                'description' => 'Lightning talks and networking to close the year.'],
         ];
 
         foreach ($events as $event) {

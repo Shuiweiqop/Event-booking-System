@@ -112,7 +112,7 @@ Base URL: `http://127.0.0.1:8000/api`. Every response uses the same envelope:
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| GET | `/events` | – | List events. Query: `date`, `from`, `to`, `search`, `include_past=1` (past events are hidden by default) |
+| GET | `/events` | – | List events, paginated. Query: `date`, `from`, `to`, `search`, `include_past=1` (past events are hidden by default), `page` (default 1), `per_page` (default 10, max 50). The response includes `meta: { current_page, last_page, per_page, total, from, to }` |
 | GET | `/events/{id}` | – | Single event |
 | POST | `/registrations` | – | **Step 1.** `{ event_id, name, email }`. Checks the booking rules and emails a 6-digit code. Returns **202** with `verification_id`. No seat is taken yet |
 | POST | `/registrations/verify` | code | **Step 2.** `{ verification_id, code }`. Creates the booking. Returns **201** with the registration and a one-time `cancel_token` (also emailed) |
@@ -256,7 +256,8 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] Real concurrency test against MySQL (`php artisan booking:race-test`)
 - [x] Deployable demo: `docker compose up --build` (MySQL 8 + Laravel + nginx)
 - [x] Live slot counts: the event list auto-refreshes every 30 s and when the tab regains focus (paused while hidden)
-- [x] Automated backend tests (23 feature tests)
+- [x] Pagination (API `page`/`per_page` with a stable sort order; numbered pager on the event list and the admin dashboard)
+- [x] Automated backend tests (29 feature tests) + frontend unit tests (Vitest)
 
 ## 8. Assumptions
 

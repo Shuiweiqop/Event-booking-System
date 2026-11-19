@@ -210,6 +210,74 @@ class RegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------
+     | Pagination
+     * ------------------------------------------------------------------ */
+
+    private function makeEvents(int $n): void
+    {
+        foreach (range(1, $n) as $i) {
+            $this->makeEvent(['title' => "Event {$i}", 'event_date' => today()->addDays($i)->toDateString()]);
+        }
+    }
+
+    public function test_events_are_paginated_with_meta(): void
+    {
+        $this->makeEvents(12);
+
+        $this->getJson('/api/events?per_page=5&page=2')
+            ->assertOk()
+            ->assertJsonCount(5, 'data')
+            ->assertJsonPath('data.0.title', 'Event 6')
+            ->assertJsonPath('meta', [
+                'current_page' => 2, 'last_page' => 3, 'per_page' => 5, 'total' => 12, 'from' => 6, 'to' => 10,
+            ]);
+
+        $this->getJson('/api/events?per_page=5&page=3')->assertJsonCount(2, 'data')->assertJsonPath('meta.to', 12);
+    }
+
+    public function test_default_page_size_is_10(): void
+    {
+        $this->makeEvents(12);
+
+        $this->getJson('/api/events')->assertJsonCount(10, 'data')->assertJsonPath('meta.last_page', 2);
+    }
+
+    public function test_pages_do_not_overlap_when_events_share_date_and_time(): void
+    {
+        foreach (range(1, 7) as $i) {
+            $this->makeEvent(['title' => "Same {$i}", 'start_time' => '10:00']);
+        }
+
+        $ids = collect([1, 2, 3])
+            ->flatMap(fn ($p) => $this->getJson("/api/events?per_page=3&page={$p}")->json('data.*.id'));
+
+        $this->assertCount(7, $ids);
+        $this->assertCount(7, $ids->unique());
+    }
+
+    public function test_page_beyond_last_returns_empty_data(): void
+    {
+        $this->makeEvents(3);
+
+        $this->getJson('/api/events?page=5')->assertOk()->assertJsonCount(0, 'data')->assertJsonPath('meta.total', 3);
+    }
+
+    public function test_per_page_is_capped(): void
+    {
+        $this->getJson('/api/events?per_page=500')->assertStatus(422)->assertJsonValidationErrors('per_page');
+        $this->getJson('/api/events?page=0')->assertStatus(422)->assertJsonValidationErrors('page');
+    }
+
+    public function test_pagination_respects_filters(): void
+    {
+        $this->makeEvents(12);
+        $this->makeEvent(['title' => 'Special Workshop', 'event_date' => today()->addDays(40)->toDateString()]);
+
+        $this->getJson('/api/events?search=special&per_page=5')
+            ->assertJsonCount(1, 'data')->assertJsonPath('meta.total', 1)->assertJsonPath('meta.last_page', 1);
+    }
+
+    /* ------------------------------------------------------------------
      | Email verification
      * ------------------------------------------------------------------ */
 

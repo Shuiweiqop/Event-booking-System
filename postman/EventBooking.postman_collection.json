@@ -57,7 +57,7 @@
                             }
                         ],
                         "url": {
-                            "raw": "{{baseUrl}}/events",
+                            "raw": "{{baseUrl}}/events?page=1&per_page=10",
                             "host": [
                                 "{{baseUrl}}"
                             ],
@@ -91,10 +91,32 @@
                                     "key": "include_past",
                                     "value": "1",
                                     "disabled": true
+                                },
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "description": "Page number (default 1)"
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "10",
+                                    "description": "Items per page (default 10, max 50)"
                                 }
                             ]
                         }
-                    }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "const b = pm.response.json();",
+                                    "pm.test(\"200\", () => pm.response.to.have.status(200));",
+                                    "pm.test(\"has pagination meta\", () => pm.expect(b.meta).to.include.keys(\"current_page\", \"last_page\", \"per_page\", \"total\"));"
+                                ]
+                            }
+                        }
+                    ]
                 },
                 {
                     "name": "Get event",

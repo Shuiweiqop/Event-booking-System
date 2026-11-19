@@ -34,5 +34,5 @@ bootstrap/app.php                            routes + JSON error rendering for /
 database/migrations/                         schema (events, registrations, registration_verifications, is_admin)
 database/seeders/DatabaseSeeder.php          demo admin + sample events
 routes/api.php                               route definitions
-tests/Feature/RegistrationTest.php           23 feature tests
+tests/Feature/RegistrationTest.php           29 feature tests
 ```

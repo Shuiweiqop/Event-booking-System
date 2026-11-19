@@ -120,6 +120,13 @@ code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .slots__bar span.is-full { background: var(--danger); }
 .slots__text { font-size: .85rem; font-weight: 600; }
 
+/* ---------- Pagination ---------- */
+.pagination { display: flex; justify-content: space-between; align-items: center; gap: .75rem 1rem; flex-wrap: wrap; margin-top: 1.25rem; }
+.pagination__summary { margin: 0; }
+.pagination__controls { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.pagination__controls .btn--sm { min-width: 2.2rem; }
+.pagination__gap { padding: 0 .25rem; color: var(--muted); }
+
 /* ---------- Alerts / spinner / empty ---------- */
 .alert { display: flex; gap: .7rem; align-items: flex-start; padding: .8rem 1rem; border-radius: 10px; margin-bottom: 1rem; font-size: .93rem; }
 .alert__icon { flex: none; width: 1.4rem; height: 1.4rem; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: .8rem; color: #fff; }

@@ -13,12 +13,17 @@ class EventController extends Controller
 {
     use RespondsWithJson;
 
+    public const DEFAULT_PER_PAGE = 10;
+
+    public const MAX_PER_PAGE = 50;
+
     /**
      * GET /api/events
      *   ?date=YYYY-MM-DD           exact date
      *   ?from=YYYY-MM-DD&to=...    date range
      *   ?search=keyword            title / venue
      *   ?include_past=1            past events are hidden by default
+     *   ?page=1&per_page=10        pagination (per_page max 50); response has a `meta` block
      */
     public function index(Request $request): JsonResponse
     {
@@ -28,6 +33,8 @@ class EventController extends Controller
             'to' => ['nullable', 'date_format:Y-m-d', 'after_or_equal:from'],
             'search' => ['nullable', 'string', 'max:100'],
             'include_past' => ['nullable', 'boolean'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
         ]);
 
         $events = Event::query()
@@ -42,9 +49,10 @@ class EventController extends Controller
                 fn ($q) => $q->whereDate('event_date', '>=', today()))
             ->orderBy('event_date')
             ->orderBy('start_time')
-            ->get();
+            ->orderBy('id') // stable order, so an item never appears on two pages
+            ->paginate($filters['per_page'] ?? self::DEFAULT_PER_PAGE);
 
-        return $this->ok('Events retrieved.', EventResource::collection($events));
+        return $this->okPaginated('Events retrieved.', $events, EventResource::class);
     }
 
     public function show(int $id): JsonResponse
