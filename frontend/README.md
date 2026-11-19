@@ -1,0 +1,43 @@
+# Event Booking — Frontend (React + Vite)
+
+Setup, API and design notes are in the [root README](../README.md).
+
+```bash
+npm install
+cp .env.example .env     # VITE_API_URL=/api → proxied to http://127.0.0.1:8000 by Vite
+npm run dev              # http://localhost:5173
+npm run build            # production build in dist/
+```
+
+## Pages
+
+| Route | Page |
+|---|---|
+| `/` | Event listing with search, date filter and "show past"; opens a registration modal |
+| `/my-bookings` | Bookings made in this browser; cancel, or cancel any booking with ID + code |
+| `/admin` | Admin login, then dashboard (create event, delete event, view attendees) |
+
+## Structure
+
+```
+src/
+├── api/
+│   ├── client.js            axios instance: base URL, bearer token, error normalisation
+│   └── index.js             eventsApi / registrationsApi / adminApi
+├── components/
+│   ├── EventCard.jsx        title, date, slots bar, register button (disabled when full/past/booked)
+│   ├── EventFilters.jsx     debounced search + date filter
+│   ├── RegistrationForm.jsx name/email form, validation, confirmation screen
+│   ├── InputField.jsx       label + input + inline error (accessible)
+│   ├── Modal.jsx, Alert.jsx, Spinner.jsx, EmptyState.jsx, Navbar.jsx
+├── context/AuthContext.jsx  admin token state, login / logout
+├── hooks/
+│   ├── useEvents.js         fetch + loading/error + refetch, aborts stale requests
+│   └── useMyBookings.js     localStorage bookings, synced across tabs
+├── pages/                   EventsPage, MyBookingsPage, AdminLoginPage, AdminDashboardPage
+├── utils/                   format.js (dates), validation.js
+├── App.jsx                  routes
+└── main.jsx
+```
+
+Only functional components and hooks are used. Every network call has loading, error and empty states. The server is the source of truth: client-side checks only give earlier feedback.
