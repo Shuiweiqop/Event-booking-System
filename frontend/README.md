@@ -35,7 +35,8 @@ src/
 │   ├── InputField.jsx       label + input + inline error (accessible)
 │   ├── LiveIndicator.jsx    "Live · slots updated 12s ago"
 │   ├── Pagination.jsx       prev / numbered pages with ellipsis / next (+ Pagination.test.jsx)
-│   ├── Modal.jsx, Alert.jsx, Spinner.jsx, EmptyState.jsx, Navbar.jsx
+│   ├── Modal.jsx            dialog: Esc/backdrop close, focus trap, focus returns to opener (+ test)
+│   ├── Alert.jsx, Spinner.jsx, EmptyState.jsx, Navbar.jsx
 ├── context/AuthContext.jsx  admin token state, login / logout
 ├── hooks/
 │   ├── useEvents.js         fetch + loading/error + refetch, aborts stale requests,

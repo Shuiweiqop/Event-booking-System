@@ -540,6 +540,32 @@ class RegistrationTest extends TestCase
         $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $newCode])->assertCreated();
     }
 
+    public function test_abandoned_verifications_are_pruned_but_recent_and_verified_ones_are_kept(): void
+    {
+        $event = $this->makeEvent();
+        $abandoned = $this->requestCode($event, 'old@example.com')->json('data.verification_id');
+        $verified = $this->requestCode($event, 'done@example.com')->json('data.verification_id');
+        $this->postJson('/api/registrations/verify', ['verification_id' => $verified, 'code' => $this->lastCode()])->assertCreated();
+
+        $this->travel(2)->days();
+        $recent = $this->requestCode($event, 'new@example.com')->json('data.verification_id');
+
+        $this->artisan('model:prune', ['--model' => [\App\Models\RegistrationVerification::class]])->assertSuccessful();
+
+        $this->assertDatabaseMissing('registration_verifications', ['id' => $abandoned]);
+        $this->assertDatabaseHas('registration_verifications', ['id' => $verified]);
+        $this->assertDatabaseHas('registration_verifications', ['id' => $recent]);
+    }
+
+    public function test_pruning_is_scheduled_daily(): void
+    {
+        $event = collect(app(\Illuminate\Console\Scheduling\Schedule::class)->events())
+            ->first(fn ($e) => str_contains($e->command, 'model:prune') && str_contains($e->command, 'RegistrationVerification'));
+
+        $this->assertNotNull($event, 'model:prune for RegistrationVerification is not scheduled');
+        $this->assertSame('0 0 * * *', $event->expression);
+    }
+
     public function test_debug_code_is_only_exposed_when_enabled(): void
     {
         config(['booking.verification.expose_code' => true]);

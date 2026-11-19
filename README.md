@@ -265,7 +265,8 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] Pagination (API `page`/`per_page` with a stable sort order; numbered pager on the event list and the admin dashboard)
 - [x] One-click-safe cancel link in the confirmation email: `/cancel?id=…&token=…` opens a confirmation page, and only the explicit button cancels
 - [x] API documentation: OpenAPI 3 spec + Swagger UI at `/api/docs`, kept in sync with the routes by a test
-- [x] Automated tests: 46 backend feature tests (PHPUnit) + 28 frontend unit tests (Vitest)
+- [x] Housekeeping: abandoned email verifications are pruned daily (`MassPrunable` + scheduler); dialogs trap focus and return it to the opener
+- [x] Automated tests: 48 backend feature tests (PHPUnit) + 32 frontend unit tests (Vitest)
 
 ## 8. Assumptions
 

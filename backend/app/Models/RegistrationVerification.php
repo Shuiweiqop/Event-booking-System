@@ -2,13 +2,27 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\MassPrunable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RegistrationVerification extends Model
 {
-    use HasUuids;
+    use HasUuids, MassPrunable;
+
+    /**
+     * Abandoned verifications (never confirmed, expired more than a day ago) are deleted by
+     * `php artisan model:prune`, scheduled daily in routes/console.php. Verified rows are kept
+     * because they link to the registration they created.
+     */
+    public function prunable(): Builder
+    {
+        return static::query()
+            ->whereNull('verified_at')
+            ->where('expires_at', '<', now()->subDay());
+    }
 
     protected $fillable = [
         'event_id', 'name', 'email', 'code_hash', 'attempts',

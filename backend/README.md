@@ -36,8 +36,9 @@ bootstrap/app.php                            routes + JSON error rendering for /
 database/migrations/                         schema (events, registrations, registration_verifications, is_admin)
 database/seeders/DatabaseSeeder.php          demo admin + sample events
 routes/api.php                               route definitions
+routes/console.php                           scheduler: daily model:prune of abandoned verifications
 docs/openapi.yaml                            OpenAPI 3 spec, served at /api/openapi.yaml, Swagger UI at /api/docs
 resources/views/api-docs.blade.php           Swagger UI page
-tests/Feature/RegistrationTest.php           40 feature tests (booking rules, verification, cancel link, pagination, admin edit)
+tests/Feature/RegistrationTest.php           42 feature tests (booking rules, verification, cancel link, pagination, admin edit)
 tests/Feature/ApiDocumentationTest.php       6 tests: every route documented and vice versa, $refs valid, admin ops need bearer auth
 ```
