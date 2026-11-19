@@ -17,7 +17,7 @@ npm test                 # unit tests (Vitest + Testing Library)
 | `/` | Event listing with search, date filter and "show past"; opens a registration modal |
 | `/my-bookings` | Bookings made in this browser; cancel, or cancel any booking with ID + code |
 | `/cancel?id=…&token=…` | Landing page for the cancel link in the confirmation email: shows the booking, cancels only after an explicit click |
-| `/admin` | Admin login, then dashboard (create, edit and delete events; view attendees) |
+| `/admin` | Admin login, then dashboard (create, edit and delete events; view attendees). Not linked for visitors: the navbar shows "Admin" and "Log out" only after an admin logs in |
 
 ## Structure
 
@@ -36,7 +36,8 @@ src/
 │   ├── LiveIndicator.jsx    "Live · slots updated 12s ago"
 │   ├── Pagination.jsx       prev / numbered pages with ellipsis / next (+ Pagination.test.jsx)
 │   ├── Modal.jsx            dialog: Esc/backdrop close, focus trap, focus returns to opener (+ test)
-│   ├── Alert.jsx, Spinner.jsx, EmptyState.jsx, Navbar.jsx
+│   ├── Navbar.jsx           admin links only for logged-in admins (+ Navbar.test.jsx)
+│   ├── Alert.jsx, Spinner.jsx, EmptyState.jsx
 ├── context/AuthContext.jsx  admin token state, login / logout
 ├── hooks/
 │   ├── useEvents.js         fetch + loading/error + refetch, aborts stale requests,

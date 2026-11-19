@@ -44,7 +44,7 @@ docker compose up --build
 | http://localhost:8001/api | The API directly (e.g. for Postman: set `baseUrl` to this) |
 | http://localhost:8088/api/docs | Interactive API docs (Swagger UI) |
 
-The first start takes a few minutes (it pulls images and installs dependencies). On every start, the backend container waits for MySQL and then runs the migrations and the seeder. Admin login: `admin@example.com` / `Admin@123`.
+The first start takes a few minutes (it pulls images and installs dependencies). On every start, the backend container waits for MySQL and then runs the migrations and the seeder. Admin: open http://localhost:8088/admin (it is not linked in the navbar for visitors) and log in with `admin@example.com` / `Admin@123`.
 
 Three containers are started:
 
@@ -90,7 +90,7 @@ php artisan serve               # http://127.0.0.1:8000
 
 > As an alternative to migrations, you can import `database/schema.sql`. It contains the same structure plus sample data.
 
-**Demo admin:** `admin@example.com` / `Admin@123`
+**Demo admin:** open **`/admin`** directly (e.g. http://localhost:5173/admin) and log in with `admin@example.com` / `Admin@123`. Visitors see no link to the admin area. The "Admin" and "Log out" links appear in the navbar only once an admin is logged in. Hiding the link only keeps the public UI clean; the protection itself is on the API (Sanctum token + `admin` middleware).
 
 **Verification emails in local dev:** with `MAIL_MAILER=log`, the emails (verification code, booking confirmation) are written to `backend/storage/logs/laravel.log`. In addition, `BOOKING_EXPOSE_CODE=true` (set in `.env.example`, **for local demo only**) returns the code in the API response, and the UI shows it in a "Demo mode" box so the flow can be tested without a mailbox. To send real email, configure the `MAIL_*` SMTP settings and set `BOOKING_EXPOSE_CODE=false`.
 
@@ -279,7 +279,7 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] One-click-safe cancel link in the confirmation email: `/cancel?id=…&token=…` opens a confirmation page, and only the explicit button cancels
 - [x] API documentation: OpenAPI 3 spec + Swagger UI at `/api/docs`, kept in sync with the routes by a test
 - [x] Housekeeping: abandoned email verifications are pruned daily (`MassPrunable` + scheduler); dialogs trap focus and return it to the opener
-- [x] Automated tests: 53 backend tests (48 feature + 5 unit, PHPUnit) + 32 frontend unit tests (Vitest)
+- [x] Automated tests: 53 backend tests (48 feature + 5 unit, PHPUnit) + 35 frontend unit tests (Vitest)
 - [x] Continuous integration (GitHub Actions): backend tests, the MySQL 8 concurrency test, frontend lint/tests/build and the Docker build on every push
 
 ## 8. Assumptions

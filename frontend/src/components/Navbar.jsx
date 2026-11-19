@@ -18,9 +18,13 @@ export default function Navbar() {
           <NavLink to="/my-bookings">
             My Bookings {active > 0 && <span className="badge">{active}</span>}
           </NavLink>
-          <NavLink to="/admin">Admin</NavLink>
+          {/* No public entry point to the back office: admins open /admin directly.
+              (UX only — the API itself is protected by Sanctum + the `admin` middleware.) */}
           {isAdmin && (
-            <button type="button" className="btn btn--ghost btn--sm" onClick={logout}>Log out</button>
+            <>
+              <NavLink to="/admin">Admin</NavLink>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={logout}>Log out</button>
+            </>
           )}
         </nav>
       </div>
