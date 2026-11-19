@@ -29,7 +29,7 @@ src/
 ├── components/
 │   ├── EventCard.jsx        title, date, slots bar, register button (disabled when full/past/booked)
 │   ├── EventFilters.jsx     debounced search + date filter
-│   ├── RegistrationForm.jsx details → verify code → confirmation (3 steps)
+│   ├── RegistrationForm.jsx details → verify code → confirmation (3 steps); booking rules decided by the server
 │   ├── VerifyCodeStep.jsx   6-digit code input, attempts/expiry errors, resend countdown
 │   ├── EventForm.jsx        shared create / edit event form (+ EventForm.test.jsx)
 │   ├── InputField.jsx       label + input + inline error (accessible)
@@ -43,7 +43,8 @@ src/
 │   ├── useEvents.js         fetch + loading/error + refetch, aborts stale requests,
 │   │                        auto-refresh every 30 s / on tab focus (paused while hidden)
 │   ├── useEvents.test.js    8 tests for the refresh behaviour (fake timers)
-│   ├── useMyBookings.js     localStorage bookings, synced across tabs
+│   ├── useMyBookings.js     localStorage cache of my bookings (synced across tabs); syncWithServer()
+│   │                        refreshes date/status from the API, since an admin may move or delete events
 │   └── useCountdown.js      seconds-left timer (resend cooldown)
 ├── pages/                   EventsPage, MyBookingsPage, CancelBookingPage (+ test), AdminLoginPage, AdminDashboardPage
 ├── test/setup.js            jest-dom matchers + cleanup between tests

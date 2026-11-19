@@ -10,10 +10,12 @@ import VerifyCodeStep from './VerifyCodeStep'
 
 /**
  * Registration for one event, in three steps:
- *   details  -> client validation, local same-date hint, POST /registrations (emails a code)
+ *   details  -> field validation, POST /registrations (rules pre-checked by the server, code emailed)
  *   verify   -> enter the code (VerifyCodeStep), POST /registrations/verify
  *   done     -> confirmation with booking ID + cancellation code
- * The server is the source of truth for every rule; client checks just save a round-trip.
+ * Only field formats are checked here. Booking rules (same date, full, past) are decided by the
+ * server alone: a local copy of "my bookings" can be stale (e.g. an admin moved an event), and
+ * blocking on it would wrongly stop requests the server allows.
  */
 export default function RegistrationForm({ event, onSuccess, onClose }) {
   const [form, setForm] = useState({ name: '', email: '' })
@@ -22,7 +24,7 @@ export default function RegistrationForm({ event, onSuccess, onClose }) {
   const [submitting, setSubmitting] = useState(false)
   const [pending, setPending] = useState(null) // verification in progress
   const [result, setResult] = useState(null)
-  const { addBooking, findConflict } = useMyBookings()
+  const { addBooking } = useMyBookings()
 
   const update = (field) => (e) => {
     setForm((f) => ({ ...f, [field]: e.target.value }))
@@ -35,16 +37,6 @@ export default function RegistrationForm({ event, onSuccess, onClose }) {
     const clientErrors = validateRegistration(form)
     if (Object.keys(clientErrors).length) {
       setErrors(clientErrors)
-      return
-    }
-
-    const conflict = findConflict(form.email, event.event_date)
-    if (conflict) {
-      setServerError(
-        conflict.event_id === event.id
-          ? 'You are already registered for this event.'
-          : `You already registered for an event on this date ("${conflict.event?.title ?? 'another event'}").`,
-      )
       return
     }
 

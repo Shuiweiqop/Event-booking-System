@@ -193,6 +193,7 @@ code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 .pill { font-size: .75rem; font-weight: 700; text-transform: capitalize; padding: .15rem .55rem; border-radius: 99px; }
 .pill--confirmed { background: var(--success-soft); color: var(--success); }
 .pill--cancelled { background: #eeece6; color: var(--muted); }
+.pill--removed { background: #fdf2dc; color: var(--warn); }
 .panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: .9rem 1.1rem; }
 .panel summary { cursor: pointer; font-weight: 600; }
 .inline-form { display: flex; gap: .75rem; align-items: flex-end; flex-wrap: wrap; margin-top: 1rem; }

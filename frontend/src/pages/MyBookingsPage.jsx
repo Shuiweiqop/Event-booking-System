@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { registrationsApi } from '../api'
 import Alert from '../components/Alert'
@@ -9,9 +9,17 @@ import useMyBookings from '../hooks/useMyBookings'
 import { formatDate, todayYmd } from '../utils/format'
 
 export default function MyBookingsPage() {
-  const { bookings, markCancelled, removeBooking } = useMyBookings()
+  const { bookings, markCancelled, removeBooking, syncWithServer } = useMyBookings()
   const [busyId, setBusyId] = useState(null)
   const [message, setMessage] = useState(null)
+  const [syncing, setSyncing] = useState(false)
+
+  // The browser copy can be stale (event moved by an admin, cancelled on another device,
+  // event deleted) — refresh it from the server every time the page is opened.
+  useEffect(() => {
+    setSyncing(true)
+    syncWithServer().finally(() => setSyncing(false))
+  }, [syncWithServer])
 
   const cancel = async (booking) => {
     if (!window.confirm(`Cancel your booking for "${booking.event?.title}"?`)) return
@@ -22,9 +30,9 @@ export default function MyBookingsPage() {
       markCancelled(booking.id)
       setMessage({ type: 'success', text: body.message })
     } catch (err) {
-      // Event deleted by admin / already cancelled elsewhere -> keep local state honest.
-      if (err.status === 404 || /already been cancelled/i.test(err.message)) markCancelled(booking.id)
       setMessage({ type: 'error', text: err.message })
+      // Already cancelled elsewhere / event deleted: pull the real state.
+      syncWithServer()
     } finally {
       setBusyId(null)
     }
@@ -39,6 +47,7 @@ export default function MyBookingsPage() {
           <h1>My bookings</h1>
           <p className="muted">Bookings made from this browser.</p>
         </div>
+        {syncing && bookings.length > 0 && <Spinner inline label="Updating bookings…" />}
       </div>
 
       {message && <Alert type={message.type} onClose={() => setMessage(null)}>{message.text}</Alert>}
@@ -50,12 +59,15 @@ export default function MyBookingsPage() {
           {bookings.map((b) => {
             const past = b.event_date < today
             return (
-              <li key={b.id} className={`booking ${b.status === 'cancelled' ? 'booking--cancelled' : ''}`}>
+              <li key={b.id} className={`booking ${b.status !== 'confirmed' ? 'booking--cancelled' : ''}`}>
                 <div>
                   <strong>{b.event?.title ?? `Event #${b.event_id}`}</strong>
                   <p className="muted small">
                     {formatDate(b.event_date)} · Booking #{b.id} · {b.email}
                   </p>
+                  {b.status === 'removed' && (
+                    <p className="small text-warn">This event was removed by the organiser.</p>
+                  )}
                 </div>
                 <div className="booking__actions">
                   <span className={`pill pill--${b.status}`}>{b.status}</span>

@@ -289,7 +289,7 @@ Validation happens in layers. The frontend checks give quick feedback; the backe
 | Event is full | Register button disabled ("Fully booked") | Counted under row lock, returns 409 |
 | Event is in the past | Button disabled ("Event ended") | `isPast()` check, returns 422 |
 | Same email already booked this event | Button shows "You're registered" | returns 409 *"You are already registered for this event."* |
-| Same email already booked another event that date | Checked against this browser's bookings before submit | App check + **UNIQUE index**, returns 409 *"You already registered for an event on this date."* |
+| Same email already booked another event that date | Not checked locally: the browser's copy of bookings can be stale (e.g. an admin moved an event), so the server decides at step 1 | App check + **UNIQUE index**, returns 409 *"You already registered for an event on this date."* |
 | Email belongs to the person booking | 6-digit code step, resend timer | `EmailVerificationService`: expiry 410, wrong code 422 with attempts left, 5 attempts then 429 |
 | Admin: title, date ≥ today, capacity ≥ 1 | `validateEvent()` | `StoreEventRequest` |
 
@@ -368,7 +368,7 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] One-click-safe cancel link in the confirmation email: `/cancel?id=…&token=…` opens a confirmation page, and only the explicit button cancels
 - [x] API documentation: OpenAPI 3 spec + Swagger UI at `/api/docs`, kept in sync with the routes by a test
 - [x] Housekeeping: abandoned email verifications are pruned daily (`MassPrunable` + scheduler); dialogs trap focus and return it to the opener
-- [x] Automated tests: 55 backend tests (50 feature + 5 unit, PHPUnit) + 35 frontend unit tests (Vitest)
+- [x] Automated tests: 55 backend tests (50 feature + 5 unit, PHPUnit) + 41 frontend unit tests (Vitest)
 - [x] Continuous integration (GitHub Actions): backend tests, the MySQL 8 concurrency test, frontend lint/tests/build and the Docker build on every push
 
 ## 8. Assumptions
