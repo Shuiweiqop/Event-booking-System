@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\RespondsWithJson;
 use App\Http\Requests\StoreEventRequest;
+use App\Http\Requests\UpdateEventRequest;
 use App\Http\Resources\EventResource;
 use App\Models\Event;
+use App\Services\EventService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -69,6 +71,14 @@ class EventController extends Controller
         $event->loadCount(['confirmedRegistrations as confirmed_count']);
 
         return $this->ok('Event created.', new EventResource($event), 201);
+    }
+
+    /** Admin only. Partial update; booking-consistency rules live in EventService. */
+    public function update(UpdateEventRequest $request, EventService $events, int $id): JsonResponse
+    {
+        $event = $events->update($id, $request->validated());
+
+        return $this->ok('Event updated.', new EventResource($event));
     }
 
     /** Admin only. Registrations are removed by the FK's ON DELETE CASCADE. */

@@ -359,6 +359,56 @@ paths:
         '422': { $ref: '#/components/responses/ValidationError' }
 
   /admin/events/{id}:
+    put:
+      tags: [Admin]
+      summary: Update an event (partial)
+      description: |
+        Only the fields sent are changed. Rules (checked under the event row lock):
+        - past events can't be edited
+        - `max_attendees` can't be lower than the number of confirmed bookings
+        - changing `event_date` moves every booking to the new date; refused as a whole (409) if any
+          attendee already has another confirmed booking on the new date
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/Id' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 150 }
+                description: { type: string, maxLength: 5000, nullable: true }
+                venue: { type: string, maxLength: 150, nullable: true }
+                event_date: { type: string, format: date, description: Today or later }
+                start_time: { type: string, pattern: '^\d{2}:\d{2}$', nullable: true }
+                max_attendees: { type: integer, minimum: 1, maximum: 100000 }
+            example: { max_attendees: 40, event_date: '2026-12-31' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Envelope'
+                  - type: object
+                    properties: { data: { $ref: '#/components/schemas/Event' } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: New date conflicts with attendees' other bookings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { success: false, message: "Can't move the event to 2026-12-01: 2 attendee(s) already have another booking on that date." }
+        '422':
+          description: Validation error, capacity below confirmed bookings, or past event
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { success: false, message: "Capacity can't be lower than the 12 confirmed booking(s)." }
     delete:
       tags: [Admin]
       summary: Delete an event

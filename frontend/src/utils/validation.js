@@ -13,7 +13,8 @@ export function validateRegistration({ name, email }) {
   return errors
 }
 
-export function validateEvent({ title, event_date, max_attendees, start_time }, today) {
+/** `minCapacity`: when editing, capacity can't go below the confirmed bookings. */
+export function validateEvent({ title, event_date, max_attendees, start_time }, today, { minCapacity = 0 } = {}) {
   const errors = {}
   if (!title.trim()) errors.title = 'Title is required.'
   if (!event_date) errors.event_date = 'Date is required.'
@@ -21,6 +22,7 @@ export function validateEvent({ title, event_date, max_attendees, start_time }, 
   if (start_time && !/^\d{2}:\d{2}$/.test(start_time)) errors.start_time = 'Use HH:MM.'
   const n = Number(max_attendees)
   if (max_attendees === '' || !Number.isInteger(n) || n < 1) errors.max_attendees = 'Capacity must be a whole number ≥ 1.'
+  else if (n < minCapacity) errors.max_attendees = `Capacity can't be lower than the ${minCapacity} confirmed booking(s).`
   return errors
 }
 

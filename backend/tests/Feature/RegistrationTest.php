@@ -210,6 +210,108 @@ class RegistrationTest extends TestCase
     }
 
     /* ------------------------------------------------------------------
+     | Admin: edit event
+     * ------------------------------------------------------------------ */
+
+    private function adminToken(): string
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        return $admin->createToken('t', ['admin'])->plainTextToken;
+    }
+
+    private function updateEvent(Event $event, array $data, ?string $token = null)
+    {
+        return $this->withToken($token ?? $this->adminToken())->putJson("/api/admin/events/{$event->id}", $data);
+    }
+
+    public function test_admin_can_partially_update_an_event(): void
+    {
+        $event = $this->makeEvent(['title' => 'Old', 'venue' => 'Hall A']);
+
+        $this->updateEvent($event, ['title' => 'New title', 'venue' => null])
+            ->assertOk()
+            ->assertJsonPath('data.title', 'New title')
+            ->assertJsonPath('data.venue', null)
+            ->assertJsonPath('data.max_attendees', 10); // untouched
+    }
+
+    public function test_capacity_cannot_drop_below_confirmed_bookings(): void
+    {
+        $event = $this->makeEvent(['max_attendees' => 5]);
+        $this->register($event, 'a@example.com')->assertCreated();
+        $this->register($event, 'b@example.com')->assertCreated();
+        $token = $this->adminToken();
+
+        $this->updateEvent($event, ['max_attendees' => 1], $token)
+            ->assertStatus(422)
+            ->assertJson(['message' => "Capacity can't be lower than the 2 confirmed booking(s)."]);
+
+        $this->updateEvent($event, ['max_attendees' => 2], $token)
+            ->assertOk()->assertJsonPath('data.is_full', true);
+    }
+
+    public function test_moving_the_date_moves_bookings_and_the_per_date_rule(): void
+    {
+        $oldDate = today()->addDays(3)->toDateString();
+        $newDate = today()->addDays(9)->toDateString();
+        $event = $this->makeEvent(['event_date' => $oldDate]);
+        $this->register($event, 'jane@example.com')->assertCreated();
+
+        $this->updateEvent($event, ['event_date' => $newDate])->assertOk()->assertJsonPath('data.event_date', $newDate);
+
+        $this->assertDatabaseHas('registrations', ['email' => 'jane@example.com', 'event_date' => $newDate, 'active_event_date' => $newDate]);
+        // Jane is now free on the old date...
+        $this->register($this->makeEvent(['title' => 'Old-date event', 'event_date' => $oldDate]), 'jane@example.com')->assertCreated();
+        // ...and busy on the new one.
+        $this->register($this->makeEvent(['title' => 'New-date event', 'event_date' => $newDate]), 'jane@example.com')
+            ->assertStatus(409)->assertJson(['message' => 'You already registered for an event on this date.']);
+    }
+
+    public function test_date_change_is_refused_as_a_whole_when_attendees_conflict(): void
+    {
+        $oldDate = today()->addDays(3)->toDateString();
+        $newDate = today()->addDays(9)->toDateString();
+        $event = $this->makeEvent(['event_date' => $oldDate]);
+        $this->register($event, 'jane@example.com')->assertCreated();
+        $this->register($event, 'bob@example.com')->assertCreated();
+        // Jane already has something on the new date.
+        $this->register($this->makeEvent(['title' => 'Other', 'event_date' => $newDate]), 'jane@example.com')->assertCreated();
+
+        $this->updateEvent($event, ['event_date' => $newDate, 'title' => 'Renamed'])
+            ->assertStatus(409)
+            ->assertJson(['message' => "Can't move the event to {$newDate}: 1 attendee(s) already have another booking on that date."]);
+
+        // Nothing changed — not the event, not any booking.
+        $this->assertDatabaseHas('events', ['id' => $event->id, 'title' => 'Test Event']);
+        $this->assertSame($oldDate, $event->fresh()->event_date->toDateString());
+        $this->assertSame(2, Registration::where('event_id', $event->id)->where('active_event_date', $oldDate)->count());
+    }
+
+    public function test_past_events_cannot_be_edited_and_dates_cannot_move_into_the_past(): void
+    {
+        $past = $this->makeEvent(['event_date' => today()->subDay()->toDateString()]);
+        $this->updateEvent($past, ['title' => 'x'])->assertStatus(422)->assertJson(['message' => 'Past events cannot be edited.']);
+
+        $this->updateEvent($this->makeEvent(), ['event_date' => today()->subDay()->toDateString()])
+            ->assertStatus(422)->assertJsonValidationErrors('event_date');
+    }
+
+    public function test_update_requires_admin_and_existing_event(): void
+    {
+        $event = $this->makeEvent();
+        $this->putJson("/api/admin/events/{$event->id}", ['title' => 'x'])->assertUnauthorized();
+
+        $user = User::factory()->create(['is_admin' => false]);
+        $this->withToken($user->createToken('t', ['admin'])->plainTextToken)
+            ->putJson("/api/admin/events/{$event->id}", ['title' => 'x'])->assertForbidden();
+
+        // The auth guard caches the resolved user across requests within one test — reset it.
+        $this->app['auth']->forgetGuards();
+        $this->withToken($this->adminToken())->putJson('/api/admin/events/99999', ['title' => 'x'])->assertNotFound();
+    }
+
+    /* ------------------------------------------------------------------
      | Cancel link (confirmation email) + lookup
      * ------------------------------------------------------------------ */
 

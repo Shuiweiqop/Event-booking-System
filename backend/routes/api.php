@@ -45,6 +45,7 @@ Route::prefix('admin')->group(function () {
         Route::post('/logout', [AuthController::class, 'logout']);
 
         Route::post('/events', [EventController::class, 'store']);
+        Route::put('/events/{id}', [EventController::class, 'update'])->whereNumber('id');
         Route::delete('/events/{id}', [EventController::class, 'destroy'])->whereNumber('id');
         Route::get('/events/{id}/registrations', [RegistrationController::class, 'indexForEvent'])->whereNumber('id');
     });

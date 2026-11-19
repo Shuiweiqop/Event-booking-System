@@ -29,6 +29,7 @@ export const adminApi = {
   logout: () => unwrap(client.post('/admin/logout')),
   me: () => unwrap(client.get('/admin/me')),
   createEvent: (payload) => unwrap(client.post('/admin/events', payload)),
+  updateEvent: (id, payload) => unwrap(client.put(`/admin/events/${id}`, payload)),
   deleteEvent: (id) => unwrap(client.delete(`/admin/events/${id}`)),
   eventRegistrations: (id) => unwrap(client.get(`/admin/events/${id}/registrations`)),
 }

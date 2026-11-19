@@ -126,6 +126,7 @@ Base URL: `http://127.0.0.1:8000/api`. Every response uses the same envelope:
 | GET | `/admin/me` | Bearer | Current admin |
 | POST | `/admin/logout` | Bearer | Revokes the current token |
 | POST | `/admin/events` | Bearer | Create event `{ title, event_date, max_attendees, start_time?, venue?, description? }` |
+| PUT | `/admin/events/{id}` | Bearer | Partial update. Capacity must stay ≥ confirmed bookings. A date change moves the bookings with it and returns 409 if any attendee would end up with two events on the new date |
 | DELETE | `/admin/events/{id}` | Bearer | Delete event (its registrations cascade) |
 | GET | `/admin/events/{id}/registrations` | Bearer | Attendee list |
 
@@ -251,7 +252,7 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 
 ## 7. Bonus features implemented
 
-- [x] Admin authentication to create / delete events (plus attendee list)
+- [x] Admin authentication to create / edit / delete events (plus attendee list)
 - [x] User cancellation with automatic capacity re-adjustment
 - [x] Search / filter events by date (exact date, range via API, keyword, show past)
 - [x] Race-condition handling (explained above)
@@ -264,11 +265,11 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] Pagination (API `page`/`per_page` with a stable sort order; numbered pager on the event list and the admin dashboard)
 - [x] One-click-safe cancel link in the confirmation email: `/cancel?id=…&token=…` opens a confirmation page, and only the explicit button cancels
 - [x] API documentation: OpenAPI 3 spec + Swagger UI at `/api/docs`, kept in sync with the routes by a test
-- [x] Automated tests: 40 backend feature tests (PHPUnit) + 22 frontend unit tests (Vitest)
+- [x] Automated tests: 46 backend feature tests (PHPUnit) + 28 frontend unit tests (Vitest)
 
 ## 8. Assumptions
 
 - "Same date" means the same calendar day in the app timezone (`APP_TIMEZONE`, default `Asia/Kuala_Lumpur`). Event times do not matter for this rule.
 - Past events are listed only on request, cannot be booked, and their bookings cannot be cancelled.
-- Admins can only create and delete events. Editing an event (especially its date or capacity) was left out because it raises policy questions, such as what happens to existing bookings that would then conflict.
+- **Editing an event** (`PUT /admin/events/{id}`) keeps existing bookings consistent. Past events cannot be edited. Capacity cannot drop below the number of confirmed bookings. Changing the date moves every booking to the new date (both `event_date` and `active_event_date`), so the "one per date" rule still holds. If any attendee already has another confirmed booking on the new date, the whole change is refused with a 409 that says how many attendees conflict, rather than leaving some bookings moved and others not. Attendees are not notified about the change yet; a "your event moved" email would be the natural next step.
 - "My Bookings" in the UI is stored per browser (localStorage). From another device, a booking can still be cancelled with its booking ID + cancellation code.

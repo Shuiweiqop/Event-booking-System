@@ -19,16 +19,17 @@ app/
 ├── Http/
 │   ├── Controllers/
 │   │   ├── Concerns/RespondsWithJson.php    { success, message, data } envelope
-│   │   ├── EventController.php              list / show / create / delete
+│   │   ├── EventController.php              list / show / create / update / delete
 │   │   ├── RegistrationController.php       register / cancel / admin attendee list
 │   │   └── AuthController.php               admin login / me / logout (Sanctum)
 │   ├── Middleware/EnsureUserIsAdmin.php     `admin` route middleware
-│   ├── Requests/                            StoreRegistrationRequest, StoreEventRequest
+│   ├── Requests/                            StoreRegistrationRequest, StoreEventRequest, UpdateEventRequest
 │   └── Resources/                           EventResource (computes available_slots), RegistrationResource
 ├── Models/                                  Event, Registration, RegistrationVerification, User
 ├── Providers/AppServiceProvider.php         rate limiters (bookings, login)
 ├── Services/RegistrationService.php         ★ all booking rules + transaction / locking
 ├── Services/EmailVerificationService.php    two-step booking: email code → verify → book
+├── Services/EventService.php                admin edit: capacity floor, move bookings with the date, conflict check
 ├── Mail/                                    VerificationCodeMail, BookingConfirmedMail (text views in resources/views/mail)
 └── Console/Commands/RaceTestCommand.php     booking:race-test (real concurrency test)
 bootstrap/app.php                            routes + JSON error rendering for /api/*
@@ -37,6 +38,6 @@ database/seeders/DatabaseSeeder.php          demo admin + sample events
 routes/api.php                               route definitions
 docs/openapi.yaml                            OpenAPI 3 spec, served at /api/openapi.yaml, Swagger UI at /api/docs
 resources/views/api-docs.blade.php           Swagger UI page
-tests/Feature/RegistrationTest.php           34 feature tests (booking rules, verification, cancel link, pagination, admin)
+tests/Feature/RegistrationTest.php           40 feature tests (booking rules, verification, cancel link, pagination, admin edit)
 tests/Feature/ApiDocumentationTest.php       6 tests: every route documented and vice versa, $refs valid, admin ops need bearer auth
 ```
