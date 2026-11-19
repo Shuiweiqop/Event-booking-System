@@ -1,5 +1,7 @@
 # Mini Event Booking System
 
+[![CI](https://github.com/Shuiweiqop/Event-booking-System/actions/workflows/ci.yml/badge.svg)](https://github.com/Shuiweiqop/Event-booking-System/actions/workflows/ci.yml)
+
 React (Vite) frontend + Laravel 12 (PHP 8.2) REST API + MySQL.
 
 Users can browse events, register with name + email (confirmed by a 6-digit code sent to that email), and cancel. A person **cannot hold more than one booking on the same date**, and an event **cannot exceed `max_attendees`**. Both rules are enforced in the backend, inside a database transaction, with a database constraint as the final safeguard. Admins log in with a token to create and delete events.
@@ -267,6 +269,7 @@ The last row shows that the test catches a real bug: without the row lock, 8 peo
 - [x] API documentation: OpenAPI 3 spec + Swagger UI at `/api/docs`, kept in sync with the routes by a test
 - [x] Housekeeping: abandoned email verifications are pruned daily (`MassPrunable` + scheduler); dialogs trap focus and return it to the opener
 - [x] Automated tests: 48 backend feature tests (PHPUnit) + 32 frontend unit tests (Vitest)
+- [x] Continuous integration (GitHub Actions): backend tests, the MySQL 8 concurrency test, frontend lint/tests/build and the Docker build on every push
 
 ## 8. Assumptions
 
