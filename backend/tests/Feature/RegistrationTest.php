@@ -288,6 +288,37 @@ class RegistrationTest extends TestCase
         $this->assertSame(2, Registration::where('event_id', $event->id)->where('active_event_date', $oldDate)->count());
     }
 
+    public function test_pending_code_is_refused_if_the_event_moved_before_it_was_entered(): void
+    {
+        $oldDate = today()->addDays(3)->toDateString();
+        $newDate = today()->addDays(9)->toDateString();
+        $event = $this->makeEvent(['event_date' => $oldDate]);
+
+        $id = $this->requestCode($event, 'jane@example.com')->assertStatus(202)->json('data.verification_id');
+        $code = $this->lastCode();
+
+        $this->updateEvent($event, ['event_date' => $newDate])->assertOk();
+
+        $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $code])
+            ->assertStatus(409)
+            ->assertJson(['message' => "This event has been moved to {$newDate} since you requested your code. Please register again to confirm the new date."]);
+        $this->assertDatabaseCount('registrations', 0);
+
+        // Starting again for the new date works.
+        $this->register($event->fresh(), 'jane@example.com')->assertCreated()->assertJsonPath('data.registration.event_date', $newDate);
+    }
+
+    public function test_pending_code_still_works_if_only_other_fields_changed(): void
+    {
+        $event = $this->makeEvent();
+        $id = $this->requestCode($event, 'jane@example.com')->json('data.verification_id');
+        $code = $this->lastCode();
+
+        $this->updateEvent($event, ['title' => 'Renamed', 'venue' => 'Hall C'])->assertOk();
+
+        $this->postJson('/api/registrations/verify', ['verification_id' => $id, 'code' => $code])->assertCreated();
+    }
+
     public function test_past_events_cannot_be_edited_and_dates_cannot_move_into_the_past(): void
     {
         $past = $this->makeEvent(['event_date' => today()->subDay()->toDateString()]);

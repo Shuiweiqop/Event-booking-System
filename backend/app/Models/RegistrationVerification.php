@@ -25,7 +25,7 @@ class RegistrationVerification extends Model
     }
 
     protected $fillable = [
-        'event_id', 'name', 'email', 'code_hash', 'attempts',
+        'event_id', 'name', 'email', 'event_date', 'code_hash', 'attempts',
         'expires_at', 'last_sent_at', 'verified_at', 'registration_id',
     ];
 
@@ -35,6 +35,7 @@ class RegistrationVerification extends Model
     {
         return [
             'attempts' => 'integer',
+            'event_date' => 'date:Y-m-d',
             'expires_at' => 'datetime',
             'last_sent_at' => 'datetime',
             'verified_at' => 'datetime',

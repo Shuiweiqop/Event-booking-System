@@ -34,11 +34,14 @@ class EventService
                     throw new BookingException('Past events cannot be edited.', 422);
                 }
 
-                $confirmed = $event->confirmedRegistrations()->count();
-                if (isset($data['max_attendees']) && $data['max_attendees'] < $confirmed) {
-                    throw new BookingException(
-                        "Capacity can't be lower than the {$confirmed} confirmed booking(s).", 422
-                    );
+                // Only count when capacity is being changed: keeps the lock as short as possible.
+                if (isset($data['max_attendees'])) {
+                    $confirmed = $event->confirmedRegistrations()->count();
+                    if ($data['max_attendees'] < $confirmed) {
+                        throw new BookingException(
+                            "Capacity can't be lower than the {$confirmed} confirmed booking(s).", 422
+                        );
+                    }
                 }
 
                 $oldDate = $event->event_date->toDateString();
@@ -48,6 +51,8 @@ class EventService
                     $this->assertNoDateConflicts($event, $newDate);
 
                     // Keep the per-date rule intact: bookings move with the event.
+                    // (Pending email verifications are NOT moved: they remember the date the person
+                    // saw, and RegistrationService::register() refuses them if it changed.)
                     $event->registrations()->update(['event_date' => $newDate]);
                     $event->registrations()
                         ->where('status', Registration::STATUS_CONFIRMED)
@@ -70,7 +75,7 @@ class EventService
 
         $conflicts = Registration::query()
             ->whereIn('email', $attendees)
-            ->where('active_event_date', $newDate)
+            ->activeOn($newDate)
             ->where('event_id', '!=', $event->id)
             ->count();
 

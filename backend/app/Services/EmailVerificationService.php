@@ -39,6 +39,7 @@ class EmailVerificationService
             'event_id' => $event->id,
             'name' => trim($name),
             'email' => $email,
+            'event_date' => $event->event_date->toDateString(), // the date the person agreed to
             'code_hash' => RegistrationVerification::hashCode($code),
             'expires_at' => now()->addMinutes(config('booking.verification.ttl_minutes')),
             'last_sent_at' => now(),
@@ -104,8 +105,11 @@ class EmailVerificationService
         }
 
         // The real booking: all rules re-checked under the event row lock.
+        // Book only for the date the person saw when they asked for the code: if an admin
+        // moved the event in the meantime, register() refuses instead of silently using the new date.
         [$registration, $cancelToken] = $this->registrations->register(
-            $verification->event_id, $verification->name, $verification->email
+            $verification->event_id, $verification->name, $verification->email,
+            expectedDate: $verification->event_date?->toDateString(),
         );
 
         $verification->update(['verified_at' => now(), 'registration_id' => $registration->id]);

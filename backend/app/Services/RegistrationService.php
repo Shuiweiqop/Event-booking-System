@@ -29,18 +29,30 @@ class RegistrationService
     public const MSG_PAST = 'Registration is closed because this event has already taken place.';
 
     /**
+     * @param  string|null  $expectedDate  the event date the person agreed to (from the verification
+     *                                     step). Checked under the lock, so an admin moving the event
+     *                                     between "check" and "insert" can't slip through.
      * @return array{0: Registration, 1: string} the registration and the plain cancel token
      */
-    public function register(int $eventId, string $name, string $email): array
+    public function register(int $eventId, string $name, string $email, ?string $expectedDate = null): array
     {
         $email = self::normaliseEmail($email);
         $name = trim($name);
         $plainToken = Str::random(40);
 
         try {
-            $registration = DB::transaction(function () use ($eventId, $name, $email, $plainToken) {
+            $registration = DB::transaction(function () use ($eventId, $name, $email, $plainToken, $expectedDate) {
                 /** @var Event $event */
                 $event = Event::query()->whereKey($eventId)->lockForUpdate()->firstOrFail();
+
+                $currentDate = $event->event_date->toDateString();
+                if ($expectedDate !== null && $expectedDate !== $currentDate) {
+                    throw new BookingException(
+                        "This event has been moved to {$currentDate} since you requested your code. "
+                        .'Please register again to confirm the new date.',
+                        409,
+                    );
+                }
 
                 $this->assertBookable($event, $email);
 
@@ -78,7 +90,7 @@ class RegistrationService
 
         $existing = Registration::query()
             ->where('email', $email)
-            ->where('active_event_date', $event->event_date->toDateString())
+            ->activeOn($event->event_date->toDateString())
             ->first();
 
         if ($existing) {

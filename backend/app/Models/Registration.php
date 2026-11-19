@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -34,6 +35,16 @@ class Registration extends Model
     public function event(): BelongsTo
     {
         return $this->belongsTo(Event::class);
+    }
+
+    /**
+     * Confirmed bookings on a date — the one-booking-per-person-per-date rule.
+     * (active_event_date is NULL for cancelled rows, so they never match.) Shared by
+     * RegistrationService (booking) and EventService (moving an event's date).
+     */
+    public function scopeActiveOn(Builder $query, string $date): Builder
+    {
+        return $query->where('active_event_date', $date);
     }
 
     public function isConfirmed(): bool

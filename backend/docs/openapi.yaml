@@ -152,7 +152,7 @@ paths:
               example: { success: true, message: Registered successfully., data: { registration: { id: 12, status: confirmed }, cancel_token: jcI307tO… } }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: Code already used, event filled up, or same-date conflict
+          description: Code already used, event filled up, same-date conflict, or the event was moved to another date after the code was requested
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Error' }

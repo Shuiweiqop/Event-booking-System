@@ -39,7 +39,7 @@ routes/api.php                               route definitions
 routes/console.php                           scheduler: daily model:prune of abandoned verifications
 docs/openapi.yaml                            OpenAPI 3 spec, served at /api/openapi.yaml, Swagger UI at /api/docs
 resources/views/api-docs.blade.php           Swagger UI page
-tests/Feature/RegistrationTest.php           42 feature tests (booking rules, verification, cancel link, pagination, admin edit)
+tests/Feature/RegistrationTest.php           44 feature tests (booking rules, verification, cancel link, pagination, admin edit)
 tests/Feature/ApiDocumentationTest.php       6 tests: every route documented and vice versa, $refs valid, admin ops need bearer auth
 tests/Unit/RegistrationVerificationTest.php  pure unit tests (email masking, token hashing)
 ```

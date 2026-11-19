@@ -109,6 +109,7 @@ CREATE TABLE `registration_verifications` (
   `event_id`        bigint unsigned NOT NULL,
   `name`            varchar(100) NOT NULL,
   `email`           varchar(150) NOT NULL,
+  `event_date`      date DEFAULT NULL,                   -- date the person saw; verify is refused if the event moved
   `code_hash`       char(64) NOT NULL,                   -- HMAC-SHA256(code, APP_KEY)
   `attempts`        tinyint unsigned NOT NULL DEFAULT 0, -- max 5 wrong guesses
   `expires_at`      datetime NOT NULL,                   -- 10 minutes
